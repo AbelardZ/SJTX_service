@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日线复盘 - A股辅助系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.1.0/github-markdown-light.min.css" rel="stylesheet">
+    <script src="/static/marked.min.js"></script>
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-bg: rgba(255, 255, 255, 0.8);
+        }
+
+        body {
+            background: #f0f2f5;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            padding-bottom: 2rem;
+        }
+
+        .main-header {
+            background: var(--primary-gradient);
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            color: white;
+            box-shadow: 0 4px 20px rgba(118, 75, 162, 0.2);
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: var(--glass-shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title i {
+            color: #764ba2;
+        }
+
+        /* Index Cards */
+        .index-card {
+            text-align: center;
+            padding: 0.8rem;
+            border-radius: 12px;
+            background: rgba(248, 249, 250, 0.5);
+            margin-bottom: 1rem;
+        }
+        
+        .index-value { font-size: 1.1rem; font-weight: bold; }
+        .index-change { font-size: 0.9rem; }
+        .text-up { color: #dc3545; }
+        .text-down { color: #28a745; }
+
+        /* Tables */
+        .table-custom {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .table-custom th {
+            background: rgba(248, 249, 250, 0.8);
+            padding: 10px;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #e9ecef;
+            font-size: 0.9rem;
+        }
+        
+        .table-custom td {
+            padding: 10px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+
+        /* Short Term Analysis Grid */
+        .short-term-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .stat-label { font-size: 0.85rem; color: #6c757d; margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.1rem; font-weight: 600; color: #2c3e50; }
+        .stat-value.text-up { color: #dc3545; }
+        .stat-value.text-down { color: #28a745; }
+        .stat-value.text-gold { color: #b8860b; }
+        .stat-value.text-blue { color: #0d6efd; }
+        .stat-value.text-black { color: #212529; }
+
+        /* Date Picker */
+        .date-picker-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            backdrop-filter: blur(5px);
+        }
+
+        .form-control-transparent {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 20px;
+            padding: 0.25rem 1rem;
+        }
+        
+        .form-control-transparent:focus {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            box-shadow: none;
+            border-color: white;
+        }
+
+        /* Pagination */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: rgba(255,255,255,0.5);
+            border-radius: 8px;
+        }
+        
+        .pagination-btn {
+            border: 1px solid #dee2e6;
+            background: white;
+            color: #6c757d;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        
+        .pagination-btn:hover:not(:disabled) {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .sort-icon {
+            font-size: 0.8em;
+            margin-left: 4px;
+            color: #adb5bd;
+        }
+        
+        th.sortable {
+            cursor: pointer;
+        }
+        
+        th.sortable:hover {
+            background: #e9ecef;
+        }
+        
+        th.sortable.asc .sort-icon::after {
+            content: '▲';
+            color: #495057;
+        }
+        
+        th.sortable.desc .sort-icon::after {
+            content: '▼';
+            color: #495057;
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(5px);
+        }
+        
+        .nav-pills .nav-link {
+            color: #495057;
+            border-radius: 50px;
+            padding: 0.25rem 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .nav-pills .nav-link.active {
+            background-color: #764ba2;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <header class="main-header">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0"><i class="fas fa-chart-line me-2"></i>日线复盘</h1>
+                    <p class="mb-0 opacity-75">交易日期：<span id="header-date">{{ date.replace('_', '年').replace('_', '月') + '日' }}</span> <small class="ms-2 text-white-50" id="update-time"></small></p>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <a href="/" class="btn btn-outline-light rounded-pill btn-sm">系统首页</a>
+                    <div class="date-picker-container">
+                        <i class="fas fa-calendar-alt"></i>
+                        <input type="date" id="datePicker" class="form-control-transparent" value="{{ date.replace('_', '-') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 1. Market Overview -->
+        <div class="glass-card">
+            <div class="section-title">
+                <i class="fas fa-globe"></i>
+                <span>市场总览</span>
+                <a href="/dailychart/overview" class="ms-auto btn btn-sm btn-outline-primary rounded-pill">详情</a>
+            </div>
+            
+            <!-- Major Index (000985) -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="p-3 rounded bg-light border" id="major-index-container">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Indices Groups -->
+            <div class="row">
+                <div class="col-md-4">
+                    <h6 class="border-bottom pb-2 mb-3">中证指数</h6>
+                    <div class="row g-2" id="csi-indices"></div>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="border-bottom pb-2 mb-3">两市指数</h6>
+                    <div class="row g-2" id="market-indices"></div>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="border-bottom pb-2 mb-3">全球指数</h6>
+                    <div class="row g-2" id="global-indices"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Industry Overview -->
+        <div class="glass-card">
+            <div class="section-title">
+                <i class="fas fa-industry"></i>
+                <span>行业概况</span>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <ul class="nav nav-pills" id="industry-tabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" onclick="switchIndustry('sw1')">申万一级</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" onclick="switchIndustry('sw2')">申万二级</button>
+                        </li>
+                    </ul>
+                    <a href="/dailychart/industry" class="btn btn-sm btn-outline-primary rounded-pill">详情</a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table-custom" id="industry-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" onclick="sortIndustry('index_name')">指数名称 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortIndustry('change_pct')">涨跌幅 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortIndustry('change_contribution_pct')">涨跌贡献度(%) <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortIndustry('change_amount')">量能变化 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortIndustry('change_amount_pct')">量能变化率(%) <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortIndustry('change_contribution_amount_pct')">量能变化贡献度(%) <span class="sort-icon"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="pagination-container" id="industry-pagination">
+                    <span class="text-muted small" id="industry-page-info">第 1 页 / 共 1 页</span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="pagination-btn" onclick="changeIndustryPage(-1)">上一页</button>
+                        <button class="pagination-btn" onclick="changeIndustryPage(1)">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Limit Up Pool -->
+        <div class="glass-card">
+            <div class="section-title">
+                <i class="fas fa-fire"></i>
+                <span>涨停股票池</span>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <span class="badge bg-danger rounded-pill" id="limitup-count">0家</span>
+                    <a href="/dailychart/limitup" class="btn btn-sm btn-outline-primary rounded-pill">详情</a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table-custom" id="limitup-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" onclick="sortLimitUp('stock_code')">代码 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortLimitUp('stock_name')">名称 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortLimitUp('continuous_limit_number')">连板数 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortLimitUp('sealing_amount')">封单额 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortLimitUp('industry')">行业 <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortLimitUp('type1')">类型Ⅰ <span class="sort-icon"></span></th>
+                            <th class="sortable" onclick="sortLimitUp('type2')">类型Ⅱ <span class="sort-icon"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="pagination-container" id="limitup-pagination">
+                    <span class="text-muted small" id="limitup-page-info">第 1 页 / 共 1 页</span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="pagination-btn" onclick="changeLimitUpPage(-1)">上一页</button>
+                        <button class="pagination-btn" onclick="changeLimitUpPage(1)">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Short Term Analysis -->
+        <div class="glass-card">
+            <div class="section-title">
+                <i class="fas fa-thermometer-half"></i>
+                <span>短线市场分析</span>
+                <a href="/dailychart/short" class="ms-auto btn btn-sm btn-outline-primary rounded-pill">详情</a>
+            </div>
+            <div id="short-term-container">
+                <!-- Row 1 -->
+                <div class="short-term-row" id="st-row-1"></div>
+                <!-- Row 2 -->
+                <div class="short-term-row" id="st-row-2"></div>
+                <!-- Row 3 -->
+                <div class="short-term-row" id="st-row-3"></div>
+                <!-- Row 4 -->
+                <div class="short-term-row" id="st-row-4"></div>
+            </div>
+        </div>
+
+        <!-- 5. AI Daily Summary -->
+        <div class="glass-card mt-4">
+            <div class="section-title">
+                <i class="fas fa-robot"></i>
+                <span>AI日报总结</span>
+                <span class="badge bg-warning text-dark ms-2">DEEPSEEK-V3.2-Exp</span>
+                <button class="ms-auto btn btn-sm btn-primary rounded-pill" onclick="startAIAnalysis()" id="btn-ai-start">
+                    <i class="fas fa-play me-1"></i> AI分析
+                </button>
+            </div>
+            <div class="p-3">
+                <div id="ai-output" class="markdown-body mb-3 mobile-fold-text" onclick="this.classList.toggle('expanded')" style="min-height: 50px; font-size: 0.95rem; line-height: 1.6;">点击上方按钮开始分析...</div>
+                
+                <!-- Follow-up Chat -->
+                <div id="ai-chat-container" style="display: none;" class="mt-3 border-top pt-3">
+                    <div class="input-group">
+                        <input type="text" id="ai-question" class="form-control" placeholder="请输入追问内容...">
+                        <button class="btn btn-primary" type="button" onclick="sendAIChat()" id="btn-ai-chat">发送</button>
+                    </div>
+                    <div class="text-muted small mt-1">剩余追问次数: <span id="chat-count">3</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const datePicker = document.getElementById('datePicker');
+        let currentIndustryData = { sw1: [], sw2: [] };
+        let currentIndustryType = 'sw1';
+        let industrySortField = 'change_pct';
+        let industrySortAsc = false; // Default desc
+        let industryPage = 1;
+        const industryPageSize = 10;
+
+        let currentLimitUpList = [];
+        let limitUpSortField = 'continuous_limit_number';
+        let limitUpSortAsc = false;
+        let limitUpPage = 1;
+        const limitUpPageSize = 10;
+        
+        // AI Analysis
+        let chatCount = 3;
+        let aiConversationHistory = '';
+        
+        async function startAIAnalysis() {
+            const btn = document.getElementById('btn-ai-start');
+            const output = document.getElementById('ai-output');
+            const date = new URLSearchParams(window.location.search).get('date') || '{{ date }}';
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> 分析中...';
+            output.innerHTML = '';
+            aiConversationHistory = '';
+            
+            // Check if marked is loaded
+            if (typeof marked === 'undefined') {
+                output.innerHTML = '<div class="alert alert-danger">Markdown 渲染库加载失败，无法渲染内容。</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/dailychart/api/ai_analysis?date=${date}`);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value, {stream: true}); // Add stream: true
+                    aiConversationHistory += text;
+                    
+                    if (typeof marked !== 'undefined') {
+                        output.innerHTML = marked.parse(aiConversationHistory);
+                        // Scroll to bottom for better UX
+                        output.scrollTop = output.scrollHeight;
+                    } else {
+                        output.innerText = aiConversationHistory;
+                    }
+                }
+                
+                // Show chat
+                document.getElementById('ai-chat-container').style.display = 'block';
+                chatCount = 3;
+                document.getElementById('chat-count').textContent = chatCount;
+                
+            } catch (error) {
+                aiConversationHistory += `\n\n**Error:** ${error.message}`;
+                if (typeof marked !== 'undefined') {
+                    output.innerHTML = marked.parse(aiConversationHistory);
+                } else {
+                    output.innerText = aiConversationHistory;
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-redo me-1"></i> 重新分析';
+            }
+        }
+        
+        async function sendAIChat() {
+            if (chatCount <= 0) return;
+            
+            const input = document.getElementById('ai-question');
+            const btn = document.getElementById('btn-ai-chat');
+            const output = document.getElementById('ai-output');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            input.disabled = true;
+            btn.disabled = true;
+            
+            aiConversationHistory += `\n\n**追问: ${question}**\n\n`;
+            if (typeof marked !== 'undefined') {
+                output.innerHTML = marked.parse(aiConversationHistory);
+            } else {
+                output.innerText = aiConversationHistory;
+            }
+            
+            try {
+                const response = await fetch(`/dailychart/api/ai_chat?question=${encodeURIComponent(question)}`);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value, {stream: true});
+                    aiConversationHistory += text;
+                    if (typeof marked !== 'undefined') {
+                        output.innerHTML = marked.parse(aiConversationHistory);
+                        output.scrollTop = output.scrollHeight;
+                    } else {
+                        output.innerText = aiConversationHistory;
+                    }
+                }
+                
+                chatCount--;
+                document.getElementById('chat-count').textContent = chatCount;
+                input.value = '';
+                
+                if (chatCount <= 0) {
+                    input.placeholder = "追问次数已用完";
+                    input.disabled = true;
+                    btn.disabled = true;
+                }
+                
+            } catch (error) {
+                aiConversationHistory += `\n\n**Error:** ${error.message}`;
+                if (typeof marked !== 'undefined') {
+                    output.innerHTML = marked.parse(aiConversationHistory);
+                } else {
+                    output.innerText = aiConversationHistory;
+                }
+            } finally {
+                if (chatCount > 0) {
+                    input.disabled = false;
+                    btn.disabled = false;
+                    input.focus();
+                }
+            }
+        }
+
+        datePicker.addEventListener('change', (e) => {
+            const date = e.target.value.replace(/-/g, '_');
+            window.location.href = `/dailychart/main?date=${date}`;
+        });
+
+        function formatNumber(num, decimals=2) {
+            if (num === null || num === undefined) return '-';
+            return parseFloat(num).toFixed(decimals);
+        }
+
+        function formatMoney(num) {
+            if (num === null || num === undefined) return '-';
+            const val = parseFloat(num);
+            if (Math.abs(val) > 100000000) return (val / 100000000).toFixed(2) + '亿';
+            if (Math.abs(val) > 10000) return (val / 10000).toFixed(2) + '万';
+            return val.toFixed(2);
+        }
+
+        function getColorClass(val) {
+            val = parseFloat(val);
+            if (val > 0) return 'text-up';
+            if (val < 0) return 'text-down';
+            return '';
+        }
+
+        async function loadData() {
+            const date = new URLSearchParams(window.location.search).get('date') || '{{ date }}';
+            try {
+                // Load Dashboard Data
+                const response = await fetch(`/dailychart/api/dashboard_data?date=${date}`);
+                const result = await response.json();
+                
+                // Load Industry Data (Full)
+                const indResponse = await fetch(`/dailychart/api/industry_data?date=${date}`);
+                const indResult = await indResponse.json();
+                
+                if (result.status === 'success') {
+                    document.getElementById('update-time').textContent = '更新于: ' + new Date().toLocaleTimeString();
+                    
+                    renderIndices(result.data.indices);
+                    renderLimitUp(result.data.limitup.list, result.data.limitup.count, result.data.limitup.diff);
+                    renderShortTerm(result.data.short);
+                }
+                
+                if (indResult.status === 'success') {
+                    currentIndustryData = indResult.data;
+                    switchIndustry('sw1'); // Default
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }
+
+        function renderIndices(indices) {
+            // Major Index (000985)
+            const major = indices.major;
+            if (major) {
+                const html = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-1">${major.index_name} <small class="text-muted fs-6">${major.index_code}</small></h3>
+                            <div class="d-flex align-items-baseline gap-3">
+                                <span class="h2 mb-0 ${getColorClass(major.change_percent)}">${formatNumber(major.close)}</span>
+                                <span class="h4 ${getColorClass(major.change_percent)}">${formatNumber(major.change_percent)}%</span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="h5 mb-1">成交额: ${formatMoney(major.amount)}</div>
+                            <div class="h5 ${major.vol_diff > 0 ? 'text-up' : 'text-down'}">
+                                ${major.vol_status} ${formatMoney(Math.abs(major.vol_diff))}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('major-index-container').innerHTML = html;
+            }
+
+            // Helper for small cards
+            const renderSmallCard = (idx) => `
+                <div class="col-6">
+                    <div class="index-card">
+                        <div class="text-muted small mb-1 text-truncate">${idx.index_name}</div>
+                        <div class="index-change ${getColorClass(idx.change_percent)}">
+                            ${formatNumber(idx.change_percent)}%
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('csi-indices').innerHTML = indices.csi.map(renderSmallCard).join('');
+            document.getElementById('market-indices').innerHTML = indices.market.map(renderSmallCard).join('');
+            document.getElementById('global-indices').innerHTML = indices.global.map(renderSmallCard).join('');
+        }
+
+        function switchIndustry(type) {
+            currentIndustryType = type;
+            industryPage = 1; // Reset to first page
+            
+            // Update tabs
+            document.querySelectorAll('#industry-tabs .nav-link').forEach(el => el.classList.remove('active'));
+            // Find the button that called this function or the one matching the type
+            const activeBtn = document.querySelector(`#industry-tabs button[onclick="switchIndustry('${type}')"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            renderIndustryTable();
+        }
+
+        function sortIndustry(field) {
+            if (industrySortField === field) {
+                industrySortAsc = !industrySortAsc;
+            } else {
+                industrySortField = field;
+                industrySortAsc = false; // Default desc for new field usually
+            }
+            renderIndustryTable();
+        }
+
+        function changeIndustryPage(delta) {
+            const data = currentIndustryData[currentIndustryType] || [];
+            const totalPages = Math.ceil(data.length / industryPageSize);
+            const newPage = industryPage + delta;
+            
+            if (newPage >= 1 && newPage <= totalPages) {
+                industryPage = newPage;
+                renderIndustryTable();
+            }
+        }
+
+        function renderIndustryTable() {
+            const data = currentIndustryData[currentIndustryType] || [];
+            const tbody = document.querySelector('#industry-table tbody');
+            
+            // Update headers sort icons
+            document.querySelectorAll('#industry-table th').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                if (th.getAttribute('onclick').includes(industrySortField)) {
+                    th.classList.add(industrySortAsc ? 'asc' : 'desc');
+                }
+            });
+
+            // Sort
+            const sortedData = [...data].sort((a, b) => {
+                let valA = a[industrySortField];
+                let valB = b[industrySortField];
+                
+                // Handle nulls
+                if (valA === null) valA = -Infinity;
+                if (valB === null) valB = -Infinity;
+
+                if (typeof valA === 'string') {
+                    return industrySortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                return industrySortAsc ? valA - valB : valB - valA;
+            });
+
+            // Pagination
+            const totalPages = Math.ceil(sortedData.length / industryPageSize) || 1;
+            if (industryPage > totalPages) industryPage = totalPages;
+            
+            const start = (industryPage - 1) * industryPageSize;
+            const pageData = sortedData.slice(start, start + industryPageSize);
+            
+            // Render Rows
+            tbody.innerHTML = pageData.map(item => `
+                <tr>
+                    <td>${item.index_name}</td>
+                    <td class="${getColorClass(item.change_pct)}">${formatNumber(item.change_pct)}%</td>
+                    <td class="${getColorClass(item.change_contribution_pct)}">${formatNumber(item.change_contribution_pct)}%</td>
+                    <td class="${getColorClass(item.change_amount)}">${formatMoney(item.change_amount)}</td>
+                    <td class="${getColorClass(item.change_amount_pct)}">${formatNumber(item.change_amount_pct)}%</td>
+                    <td class="${getColorClass(item.change_contribution_amount_pct)}">${formatNumber(item.change_contribution_amount_pct)}%</td>
+                </tr>
+            `).join('');
+
+            // Update Pagination Info
+            document.getElementById('industry-page-info').textContent = `第 ${industryPage} 页 / 共 ${totalPages} 页`;
+            
+            // Update Buttons State
+            const prevBtn = document.querySelector('#industry-pagination button:first-child');
+            const nextBtn = document.querySelector('#industry-pagination button:last-child');
+            
+            prevBtn.disabled = industryPage <= 1;
+            nextBtn.disabled = industryPage >= totalPages;
+        }
+
+        function renderLimitUp(data, count, diff) {
+            currentLimitUpList = data || [];
+            const diffText = diff > 0 ? `增加 ${diff}` : `减少 ${Math.abs(diff)}`;
+            document.getElementById('limitup-count').textContent = `涨停总数: ${count} (较上日${diffText})`;
+            
+            renderLimitUpTable();
+        }
+
+        function sortLimitUp(field) {
+            if (limitUpSortField === field) {
+                limitUpSortAsc = !limitUpSortAsc;
+            } else {
+                limitUpSortField = field;
+                limitUpSortAsc = false;
+            }
+            renderLimitUpTable();
+        }
+
+        function changeLimitUpPage(delta) {
+            const totalPages = Math.ceil(currentLimitUpList.length / limitUpPageSize);
+            const newPage = limitUpPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                limitUpPage = newPage;
+                renderLimitUpTable();
+            }
+        }
+
+        function renderLimitUpTable() {
+            const tbody = document.querySelector('#limitup-table tbody');
+            
+            // Update headers
+            document.querySelectorAll('#limitup-table th').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                if (th.getAttribute('onclick').includes(limitUpSortField)) {
+                    th.classList.add(limitUpSortAsc ? 'asc' : 'desc');
+                }
+            });
+
+            // Sort
+            const sortedData = [...currentLimitUpList].sort((a, b) => {
+                let valA = a[limitUpSortField];
+                let valB = b[limitUpSortField];
+                
+                if (valA === null) valA = -Infinity;
+                if (valB === null) valB = -Infinity;
+
+                if (typeof valA === 'string') {
+                    return limitUpSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                return limitUpSortAsc ? valA - valB : valB - valA;
+            });
+
+            // Pagination
+            const totalPages = Math.ceil(sortedData.length / limitUpPageSize) || 1;
+            if (limitUpPage > totalPages) limitUpPage = totalPages;
+            
+            const start = (limitUpPage - 1) * limitUpPageSize;
+            const pageData = sortedData.slice(start, start + limitUpPageSize);
+
+            tbody.innerHTML = pageData.map(item => `
+                <tr>
+                    <td>${item.stock_code}</td>
+                    <td>${item.stock_name}</td>
+                    <td><span class="badge bg-warning text-dark">${item.continuous_limit_number}连板</span></td>
+                    <td>${formatMoney(item.sealing_amount)}</td>
+                    <td>${item.industry || '-'}</td>
+                    <td>${item.type1 || '-'}</td>
+                    <td>${item.type2 || '-'}</td>
+                </tr>
+            `).join('');
+
+            // Update Pagination Info
+            document.getElementById('limitup-page-info').textContent = `第 ${limitUpPage} 页 / 共 ${totalPages} 页`;
+            
+            const prevBtn = document.querySelector('#limitup-pagination button:first-child');
+            const nextBtn = document.querySelector('#limitup-pagination button:last-child');
+            
+            prevBtn.disabled = limitUpPage <= 1;
+            nextBtn.disabled = limitUpPage >= totalPages;
+        }
+
+        function renderShortTerm(data) {
+            if (!data) return;
+            
+            const getArrow = (curr, prev) => {
+                if (prev === undefined || prev === null || curr === null || curr === undefined) return '';
+                const diff = parseFloat(curr) - parseFloat(prev);
+                if (Math.abs(diff) < 0.0001) return ''; 
+                return diff > 0 ? '<span style="color: black; font-size: 0.9em;">↑</span>' : '<span style="color: black; font-size: 0.9em;">↓</span>';
+            };
+
+            const createBox = (label, key, suffix='', decimals=2, forceColorClass=null) => {
+                const value = data[key];
+                const prevValue = data.prev ? data.prev[key] : null;
+                const arrow = getArrow(value, prevValue);
+                
+                let colorClass = '';
+                if (forceColorClass) {
+                    colorClass = forceColorClass;
+                } else {
+                    colorClass = getColorClass(value);
+                }
+
+                return `
+                <div class="stat-box">
+                    <div class="stat-label">${label}</div>
+                    <div class="stat-value ${colorClass}">
+                        ${formatNumber(value, decimals)}${suffix} ${arrow}
+                    </div>
+                </div>
+            `};
+            
+            const createBoxStr = (label, value) => `
+                <div class="stat-box">
+                    <div class="stat-label">${label}</div>
+                    <div class="stat-value text-blue">${value || '-'}</div>
+                </div>
+            `;
+
+            // Row 1
+            document.getElementById('st-row-1').innerHTML = `
+                ${createBox('短线情绪综合指数', 'com_short_index', '', 2, 'text-gold')}
+                ${createBox('市场高度', 'Highest', '', 0, 'text-gold')}
+                ${createBoxStr('市场高标', data.Higheststock)}
+            `;
+
+            // Row 2
+            document.getElementById('st-row-2').innerHTML = `
+                ${createBox('上涨家数', 'advancing_number', '', 0, 'text-up')}
+                ${createBox('下跌家数', 'declining_number', '', 0, 'text-down')}
+                ${createBox('涨幅>5%', 'gaining_more_5_number', '', 0, 'text-up')}
+                ${createBox('跌幅>5%', 'losing_more_5_number', '', 0, 'text-down')}
+            `;
+
+            // Row 3
+            document.getElementById('st-row-3').innerHTML = `
+                ${createBox('一进二率', 'one_to_two_rate', '%', 2, 'text-black')}
+                ${createBox('二进三率', 'two_to_three_rate', '%', 2, 'text-black')}
+                ${createBox('三进四率', 'three_to_four_rate', '%', 2, 'text-black')}
+                ${createBox('总连板率', 'total_successive_rate', '%', 2, 'text-black')}
+                ${createBox('接力情绪强度', 'relay_sentiment_strength', '', 2, 'text-blue')}
+            `;
+
+            // Row 4
+            document.getElementById('st-row-4').innerHTML = `
+                ${createBox('稳封不炸比率', 'limitup_stable_rate', '%', 2, 'text-black')}
+                ${createBox('封板不稳定率', 'limitup_nonstability', '%', 2, 'text-black')}
+                ${createBox('涨停时间强度', 'limitup_timing', '%', 2, 'text-black')}
+                ${createBox('涨停资金强度', 'limitup_capital', '%', 2, 'text-black')}
+                ${createBox('涨停综合强度', 'limitup_com_strength', '', 2, 'text-blue')}
+            `;
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

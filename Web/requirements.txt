@@ -1,0 +1,12 @@
+Flask
+pymysql
+markdown
+Pygments
+akshare
+tabulate
+flask-login
+pymongo
+mysql-connector-python
+lunar_python
+sxtwl
+

@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短线策略 - 神机天象</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.3.3/echarts.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=1.2">
+    <style>
+        :root {
+            --bg-body: #f4f6f8;
+            --bg-card: #ffffff;
+            --bg-header: #ffffff;
+            --border-color: #e1e4e8;
+            --text-primary: #2c3e50;
+            --text-secondary: #6c757d;
+            --text-tertiary: #adb5bd;
+            --accent-color: #4e73df;
+            --up-color: #e74a3b;
+            --down-color: #1cc88a;
+        }
+
+        body {
+            background: var(--bg-body);
+            min-height: 100vh;
+            padding-top: 24px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: var(--text-primary);
+        }
+
+        /* Part 0: Header */
+        .page-header {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-header);
+            padding: 20px 32px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-color);
+        }
+        .page-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-primary);
+        }
+        .admin-link-fixed {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            background: #ffffff;
+            padding: 5px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #e1e4e8;
+        }
+        .admin-link {
+            position: absolute;
+            top: 20px;
+            right: 32px;
+        }
+
+        /* Cards */
+        .section-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .section-header {
+            background-color: #f8f9fa;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+        .section-body {
+            padding: 24px;
+        }
+
+        /* Part 2: Concept Details */
+        .concept-block {
+            margin-bottom: 32px;
+        }
+        .concept-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        .concept-name::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 18px;
+            background-color: var(--accent-color);
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+        .concept-stats {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+
+        /* Stock Table */
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .stock-table th {
+            text-align: left;
+            padding: 12px 16px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            background: #f8f9fa;
+        }
+        .stock-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f1f3f5;
+            vertical-align: middle; /* Changed from top to middle */
+        }
+        .stock-row-main {
+            background-color: #ffffff;
+            height: 80px; /* Fixed height for consistency */
+        }
+        .stock-row-sub {
+            background-color: #f8f9fa;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            height: 80px; /* Fixed height for consistency */
+        }
+        .stock-code {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            color: var(--text-tertiary);
+            margin-left: 4px;
+        }
+        .up-text { color: var(--up-color); font-weight: 500; }
+        .down-text { color: var(--down-color); font-weight: 500; }
+        
+        /* Limit Up Table Style */
+        .limit-up-table {
+            width: 100%;
+            font-size: 0.8rem;
+            border-collapse: collapse;
+        }
+        .limit-up-table td {
+            padding: 2px 4px;
+            border: none;
+            color: #333;
+        }
+        .limit-up-table .lbl {
+            color: #888;
+            margin-right: 4px;
+        }
+
+        /* Part 3: Call Auction */
+        .auction-table th, .auction-table td {
+            padding: 10px 16px;
+            font-size: 0.85rem;
+        }
+        
+        /* Form Controls */
+        .form-control {
+            border-radius: 8px;
+            border: 1px solid #ced4da;
+            background: #ffffff;
+        }
+        .form-control:focus {
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.2);
+            border-color: #4e73df;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body { padding-top: 12px; }
+            .container { padding-left: 10px; padding-right: 10px; }
+            
+            .page-header { 
+                padding: 12px 16px; 
+                flex-direction: column; 
+                align-items: flex-start !important;
+                gap: 12px;
+            }
+            .page-title { font-size: 1.4rem; }
+            
+            .admin-link-fixed {
+                position: static;
+                margin-bottom: 12px;
+                display: block;
+                text-align: center;
+                box-shadow: none;
+            }
+
+            .section-header { 
+                padding: 12px 16px; 
+                font-size: 1rem; 
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 10px;
+            }
+            .section-header > div { width: 100%; display: flex; justify-content: space-between; }
+            
+            .section-body { padding: 12px; }
+            
+            /* Charts mobile height */
+            #cycleLineChart, #strengthBarChart { height: 280px !important; }
+
+            /* Stock Table Mobile Transformation */
+            .stock-table thead { display: none; }
+            .stock-row-main, .stock-row-sub { 
+                display: block; 
+                height: auto; 
+                padding: 10px;
+                border-bottom: 1px solid #eee;
+            }
+            .stock-row-main { position: relative; padding-bottom: 5px; }
+            .stock-row-main td { 
+                display: inline-block; 
+                padding: 2px 5px; 
+                border: none;
+                width: auto !important;
+            }
+            
+            /* Hide index, make name big */
+            .stock-row-main td:nth-child(1) { display: none; }
+            .stock-row-main td:nth-child(2) { display: block; width: 100% !important; margin-bottom: 5px; font-size: 1.1rem; }
+            
+            /* Align price and pct */
+            .stock-row-main td:nth-child(3), .stock-row-main td:nth-child(4) { 
+                font-weight: bold; 
+                min-width: 80px;
+            }
+            
+            /* Amount and Turnover in second line */
+            .stock-row-main td:nth-child(5), .stock-row-main td:nth-child(6) {
+                font-size: 0.85rem;
+                color: #666;
+            }
+
+            /* Limit up info block */
+            .stock-row-main td:nth-child(7) {
+                display: block;
+                width: 100% !important;
+                background: #fdfdfd;
+                border: 1px solid #f0f0f0;
+                border-radius: 4px;
+                margin-top: 8px;
+                padding: 8px;
+            }
+            
+            .stock-row-sub { font-size: 0.8rem; padding-top: 0; background: #fff; }
+            .stock-row-sub td { display: block; border: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Part 0: Header -->
+        <div class="page-header position-relative">
+            <h1 class="page-title">短线策略看板</h1>
+            <div class="d-flex align-items-center">
+                <label class="me-2 text-secondary">日期:</label>
+                <input type="date" id="datePicker" class="form-control form-control-sm" style="width: 140px;">
+            </div>
+        </div>
+
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <div class="admin-link-fixed">
+            <a href="/shortstrategy/admin" class="btn btn-outline-dark btn-sm">
+                <i class="fas fa-cog me-1"></i> 管理后台
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Part 1: Concept Cycle -->
+        <div class="section-card">
+            <div class="section-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <div class="btn-group btn-group-sm me-3" role="group">
+                        <button type="button" class="btn btn-dark" id="btnShowLine" onclick="switchChart('line')">周期图</button>
+                        <button type="button" class="btn btn-outline-dark" id="btnShowBar" onclick="switchChart('bar')">强度图</button>
+                    </div>
+                </div>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-dark" onclick="updateCharts(3)">3日</button>
+                    <button type="button" class="btn btn-outline-dark active" id="btnDays5" onclick="updateCharts(5)">5日</button>
+                    <button type="button" class="btn btn-outline-dark" onclick="updateCharts(10)">10日</button>
+                </div>
+            </div>
+            <div class="section-body">
+                <div id="cycleLineChart" style="height: 400px; width: 100%;"></div>
+                <div id="strengthBarChart" style="height: 400px; width: 100%; display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Part 2: Concept Details -->
+        <div class="d-flex justify-content-end mb-3">
+            <button class="btn btn-sm btn-outline-dark" onclick="toggleAllConcepts(false)">
+                <i class="fas fa-compress-arrows-alt me-1"></i> 全部折叠
+            </button>
+            <button class="btn btn-sm btn-outline-dark ms-2" onclick="toggleAllConcepts(true)">
+                <i class="fas fa-expand-arrows-alt me-1"></i> 全部展开
+            </button>
+        </div>
+        <div id="conceptsContainer">
+            <!-- Loaded via JS -->
+            <div class="text-center py-5">
+                <div class="spinner-border text-dark" role="status"></div>
+                <p class="mt-2 text-muted">正在加载策略数据...</p>
+            </div>
+        </div>
+
+        <!-- Part 3: Call Auction -->
+        <div class="section-card">
+            <div class="section-header">集合竞价监控</div>
+            <div class="section-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 auction-table">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>时间</th>
+                                <th>代码</th>
+                                <th>名称</th>
+                                <th>概念</th>
+                                <th>现价</th>
+                                <th>涨幅</th>
+                                <th>未匹配金额</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auctionBody">
+                            <!-- Loaded via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+        let currentDate = '';
+        let cycleLineChart = null;
+        let strengthBarChart = null;
+        let currentDays = 5;
+
+        $(document).ready(function() {
+            const today = new Date().toISOString().split('T')[0];
+            $('#datePicker').val(today);
+            currentDate = today;
+            
+            initCharts();
+            loadAllData();
+
+            $('#datePicker').change(function() {
+                currentDate = $(this).val();
+                loadAllData();
+            });
+
+            window.addEventListener('resize', function() {
+                cycleLineChart && cycleLineChart.resize();
+                strengthBarChart && strengthBarChart.resize();
+            });
+        });
+
+        function initCharts() {
+            cycleLineChart = echarts.init(document.getElementById('cycleLineChart'));
+            strengthBarChart = echarts.init(document.getElementById('strengthBarChart'));
+        }
+
+        function switchChart(type) {
+            if (type === 'line') {
+                $('#cycleLineChart').show();
+                $('#strengthBarChart').hide();
+                $('#btnShowLine').removeClass('btn-outline-dark').addClass('btn-dark');
+                $('#btnShowBar').removeClass('btn-dark').addClass('btn-outline-dark');
+                cycleLineChart.resize();
+            } else {
+                $('#cycleLineChart').hide();
+                $('#strengthBarChart').show();
+                $('#btnShowBar').removeClass('btn-outline-dark').addClass('btn-dark');
+                $('#btnShowLine').removeClass('btn-dark').addClass('btn-outline-dark');
+                strengthBarChart.resize();
+            }
+        }
+
+        function updateCharts(days) {
+            currentDays = days;
+            // Select only the buttons in the days group
+            const dayButtons = $('#btnDays5').parent().find('.btn');
+            dayButtons.removeClass('active');
+            // Find by text
+            dayButtons.each(function() {
+                if ($(this).text().includes(days + '日')) {
+                    $(this).addClass('active');
+                }
+            });
+            loadChartData();
+        }
+
+        function loadChartData() {
+            if (!currentDate) return;
+            
+            cycleLineChart.showLoading({ text: '加载中...' });
+            strengthBarChart.showLoading({ text: '加载中...' });
+
+            $.get('/shortstrategy/api/concept_cycle_data', { date: currentDate, days: currentDays }, function(res) {
+                cycleLineChart.hideLoading();
+                strengthBarChart.hideLoading();
+
+                // Line Chart
+                const lineOption = {
+                    title: { text: '题材周期图 (涨停数)', left: 'center', textStyle: { fontSize: 14 } },
+                    tooltip: { trigger: 'axis' },
+                    legend: { top: 30, type: 'scroll' },
+                    grid: { top: 80, left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                    xAxis: { type: 'category', data: res.dates, axisLabel: { rotate: 45 } },
+                    yAxis: { type: 'value', minInterval: 1 },
+                    series: res.line_series
+                };
+                cycleLineChart.setOption(lineOption, true);
+
+                // Bar Chart
+                const barOption = {
+                    title: { text: '题材强度图 (平均涨停)', left: 'center', textStyle: { fontSize: 14 } },
+                    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                    grid: { top: 50, left: '3%', right: '12%', bottom: '3%', containLabel: true },
+                    xAxis: { type: 'value', name: '平均数' },
+                    yAxis: { 
+                        type: 'category', 
+                        data: res.strength_data.map(item => item.name).reverse(),
+                        axisLabel: { interval: 0 }
+                    },
+                    series: [{
+                        name: '强度',
+                        type: 'bar',
+                        data: res.strength_data.map(item => item.value).reverse(),
+                        label: { show: true, position: 'right' },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                                { offset: 0, color: '#83bff6' },
+                                { offset: 0.5, color: '#188df0' },
+                                { offset: 1, color: '#188df0' }
+                            ])
+                        }
+                    }]
+                };
+                strengthBarChart.setOption(barOption, true);
+            }).fail(function(err) {
+                cycleLineChart.hideLoading();
+                strengthBarChart.hideLoading();
+            });
+        }
+
+        function loadAllData() {
+            $('#conceptsContainer').html('<div class="text-center py-5"><div class="spinner-border text-dark"></div></div>');
+            $('#auctionBody').empty();
+
+            $.get('/shortstrategy/api/dashboard_data', { date: currentDate }, function(res) {
+                renderConcepts(res.concepts);
+                renderAuction(res.auction);
+                loadChartData(); // Also reload charts when date changes
+            }).fail(function(err) {
+                $('#conceptsContainer').html(`<div class="alert alert-danger">加载失败: ${err.responseJSON?.error || err.statusText}</div>`);
+            });
+        }
+
+        function toggleAllConcepts(expand) {
+            $('.concept-block .section-body').each(function() {
+                const listId = $(this).attr('id');
+                const iconId = listId.replace('concept-body-', 'concept-icon-');
+                const icon = $(`#${iconId}`);
+                
+                if (expand) {
+                    if (!$(this).is(':visible')) {
+                        $(this).slideDown(200);
+                        icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+                    }
+                } else {
+                    if ($(this).is(':visible')) {
+                        $(this).slideUp(200);
+                        icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
+                    }
+                }
+            });
+        }
+
+        function renderConcepts(conceptsData) {
+            const container = $('#conceptsContainer');
+            container.empty();
+
+            if (!conceptsData || Object.keys(conceptsData).length === 0) {
+                container.html('<div class="text-center text-muted py-4">暂无策略数据</div>');
+                return;
+            }
+
+            let conceptCounter = 0;
+
+            Object.keys(conceptsData).forEach(conceptName => {
+                // Skip Uncategorized or empty concepts
+                if (!conceptName || conceptName === 'Uncategorized') return;
+
+                conceptCounter++;
+                const listId = `concept-body-${conceptCounter}`;
+                const iconId = `concept-icon-${conceptCounter}`;
+
+                const group = conceptsData[conceptName];
+                const stocks = group.stocks;
+                const stats = group.stats;
+
+                let rowsHtml = '';
+                stocks.forEach((stock, index) => {
+                    const m = stock.market_data || {};
+                    const l = stock.limit_up_data || {};
+                    
+                    // Format Market Data
+                    const price = m.close ? parseFloat(m.close).toFixed(2) : '-';
+                    const pct = m.change_pct ? parseFloat(m.change_pct) : 0;
+                    const colorClass = pct > 0 ? 'up-text' : (pct < 0 ? 'down-text' : '');
+                    const pctStr = m.change_pct ? `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : '-';
+                    
+                    const amt = m.amount ? (m.amount / 100000000).toFixed(2) + '亿' : '-';
+                    const turnover = m.turnover_rate ? parseFloat(m.turnover_rate).toFixed(2) + '%' : '-';
+
+                    // Limit Up Extra Data
+                    let limitUpInfo = '';
+                    if (l.is_limit_up) { 
+                        // Map DB columns to display
+                        // 封板资金: sealing_amount
+                        const sealingAmt = l.sealing_amount ? (l.sealing_amount/100000000).toFixed(2) + '亿' : '-';
+                        // 强度: type1
+                        const strength = l.type1 || '-';
+                        // 封/流(%): SF
+                        const sf = l.SF !== undefined ? parseFloat(l.SF).toFixed(2) + '%' : '-';
+                        // 封/成(%): SA
+                        const sa = l.SA !== undefined ? parseFloat(l.SA).toFixed(2) + '%' : '-';
+                        // 炸板: open_number
+                        const broken = l.open_number || 0;
+                        // 连板: continuous_limit_number
+                        const consDays = l.continuous_limit_number || 1;
+                        // 形态: type2
+                        const type2 = l.type2 || '-';
+                        
+                        const formatTime = (t) => {
+                            if (!t || t.length !== 6) return t;
+                            return t.substring(0,2) + ':' + t.substring(2,4) + ':' + t.substring(4,6);
+                        };
+                        // 首封: first_limit_time, 最后封: last_limit_time
+                        const firstTime = formatTime(l.first_limit_time);
+                        const lastTime = formatTime(l.last_limit_time);
+
+                        limitUpInfo = `
+                            <table class="limit-up-table">
+                                <tr>
+                                    <td><span class="lbl">封单</span>${sealingAmt}</td>
+                                    <td><span class="lbl">强度</span>${strength}</td>
+                                    <td><span class="lbl">连板</span>${consDays}</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="lbl">封/流</span>${sf}</td>
+                                    <td><span class="lbl">封/成</span>${sa}</td>
+                                    <td><span class="lbl">炸板</span>${broken}</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="lbl">首封</span>${firstTime}</td>
+                                    <td><span class="lbl">末封</span>${lastTime}</td>
+                                    <td><span class="lbl">形态</span>${type2}</td>
+                                </tr>
+                            </table>
+                        `;
+                    }
+
+                    rowsHtml += `
+                        <tr class="stock-row-main">
+                            <td style="width: 5%; text-align: center;">${index + 1}</td>
+                            <td style="width: 15%;">
+                                <strong>${stock.stock_name}</strong>
+                                <span class="stock-code">${stock.stock_code}</span>
+                            </td>
+                            <td style="width: 10%;" class="${colorClass}">${price}</td>
+                            <td style="width: 10%;" class="${colorClass}">${pctStr}</td>
+                            <td style="width: 15%;">${amt}</td>
+                            <td style="width: 10%;">${turnover}</td>
+                            <td style="width: 35%; font-size: 0.8rem;">
+                                ${limitUpInfo}
+                            </td>
+                        </tr>
+                        <tr class="stock-row-sub">
+                            <td colspan="7">
+                                <span class="badge bg-light text-dark border me-2">${stock.type || '未分类'}</span>
+                                <div class="mobile-fold-text d-inline-block align-top" style="max-width: 80%;" onclick="this.classList.toggle('expanded')">
+                                    ${stock.illustration || '暂无说明'}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                container.append(`
+                    <div class="section-card concept-block">
+                        <div class="section-header d-flex justify-content-between" style="cursor: pointer;" onclick="toggleConcept('${listId}', '${iconId}')">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-chevron-down me-2 text-muted" id="${iconId}" style="width: 20px;"></i>
+                                <span>${conceptName}</span>
+                            </div>
+                            <span class="badge bg-dark rounded-pill">${stocks.length} 只</span>
+                        </div>
+                        <div class="section-body p-0" id="${listId}">
+                            <div class="p-3 bg-light border-bottom">
+                                <small class="text-muted">
+                                    涨停: <strong>${stats.limit_up_count}</strong> | 
+                                    平均涨幅: <strong>${stats.avg_pct}%</strong> | 
+                                    总成交: <strong>${stats.total_amt}亿</strong>
+                                </small>
+                            </div>
+                            <table class="stock-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 5%;">序号</th>
+                                        <th>股票</th>
+                                        <th>现价</th>
+                                        <th>涨跌幅</th>
+                                        <th>成交额</th>
+                                        <th>换手率</th>
+                                        <th>涨停分析</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        function toggleConcept(listId, iconId) {
+            $(`#${listId}`).slideToggle(200, function() {
+                const icon = $(`#${iconId}`);
+                if ($(this).is(':visible')) {
+                    icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+                } else {
+                    icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
+                }
+            });
+        }
+
+        function renderAuction(auctionData) {
+            const tbody = $('#auctionBody');
+            if (!auctionData || auctionData.length === 0) {
+                tbody.html('<tr><td colspan="8" class="text-center text-muted">暂无竞价数据</td></tr>');
+                return;
+            }
+
+            auctionData.forEach(item => {
+                const pct = item.change_pct ? parseFloat(item.change_pct) : 0;
+                const colorClass = pct > 0 ? 'up-text' : (pct < 0 ? 'down-text' : '');
+                const price = item.price ? parseFloat(item.price).toFixed(2) : '-';
+                
+                tbody.append(`
+                    <tr>
+                        <td>${item.time_str || '-'}</td>
+                        <td>${item.stock_code}</td>
+                        <td>${item.stock_name}</td>
+                        <td>${item.concept || '-'}</td>
+                        <td class="${colorClass}">${price}</td>
+                        <td class="${colorClass}">${pct > 0 ? '+' : ''}${pct.toFixed(2)}%</td>
+                        <td>${item.unmatched_ask_amount ? (item.unmatched_ask_amount/10000).toFixed(2)+'万' : '-'}</td>
+                        <td>${item.is_limitup ? '<span class="badge bg-danger">涨停</span>' : ''}</td>
+                    </tr>
+                `);
+            });
+        }
+    </script>
+</body>
+</html>

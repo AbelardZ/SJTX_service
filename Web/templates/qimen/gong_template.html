@@ -1,0 +1,134 @@
+<!-- 宫位内容标准模板 -->
+<div class="gong-content">
+    <!-- 地支 - 左上角灰色 -->
+    <div class="gong-dizhi di-zhi">{{ diZhi if diZhi else '' }}</div>
+    
+    <!-- 地支2 - 隐藏元素 -->
+    <div class="gong-dizhi2"></div>
+    
+    <!-- 八神 - 中上位置 -->
+    {% set shenColor = "" %}
+    {% if baShen == '太阴' %}
+        {% set shenColor = "wuxing-shui" %}
+    {% elif baShen == '六合' %}
+        {% set shenColor = "wuxing-mu" %}
+    {% elif baShen == '白虎' %}
+        {% set shenColor = "wuxing-tu" %}
+    {% elif baShen == '玄武' %}
+        {% set shenColor = "wuxing-purple" %}
+    {% elif baShen == '九地' %}
+        {% set shenColor = "wuxing-tu" %}
+    {% elif baShen == '九天' %}
+        {% set shenColor = "wuxing-tu" %}
+    {% elif baShen == '腾蛇' %}
+        {% set shenColor = "wuxing-huo" %}
+    {% elif baShen == '值符' %}
+        {% set shenColor = "wuxing-mu" %}
+    {% endif %}
+    <div class="gong-bashen {{ shenColor }}">{{ baShen if baShen else '' }}</div>
+    
+    <!-- 天干方位 - 右上角灰色（只显示空标记） -->
+    <div class="gong-tianganfang di-zhi">
+        {% if showEmptyCircle %}
+        <span class="circle-mark {{ 'grey-circle' if emptyType == 'gray' else 'yellow-circle' }}">{{ emptyContent if emptyContent else '空' }}</span>
+        {% endif %}
+    </div>
+    
+    <!-- 天干方位2 - 隐藏元素 -->
+    <div class="gong-tianganfang2"></div>
+    
+    <!-- 八门 - 中间位置 -->
+    {% set menColor = "" %}
+    {% if baMen == '休门' %}
+        {% set menColor = "wuxing-shui" %}
+    {% elif baMen == '生门' %}
+        {% set menColor = "wuxing-mu" %}
+    {% elif baMen == '伤门' %}
+        {% set menColor = "wuxing-mu" %}
+    {% elif baMen == '杜门' %}
+        {% set menColor = "wuxing-tu" %}
+    {% elif baMen == '景门' %}
+        {% set menColor = "wuxing-huo" %}
+    {% elif baMen == '死门' %}
+        {% set menColor = "wuxing-tu" %}
+    {% elif baMen == '惊门' %}
+        {% set menColor = "wuxing-jin" %}
+    {% elif baMen == '开门' %}
+        {% set menColor = "wuxing-jin" %}
+    {% endif %}
+    <div class="gong-bamen {{ menColor }}">{{ baMen if baMen else '' }}</div>
+    
+    <!-- 宫位名2 - 隐藏元素 -->
+    <div class="gong-gongname2"></div>
+    
+    <!-- 九星 - 居中显示 -->
+    {% set xingColor = "" %}
+    {% if jiuXing == '天蓬' %}
+        {% set xingColor = "wuxing-shui" %}
+    {% elif jiuXing == '天冲' %}
+        {% set xingColor = "wuxing-mu" %}
+    {% elif jiuXing == '天辅' %}
+        {% set xingColor = "wuxing-mu" %}
+    {% elif jiuXing == '天英' %}
+        {% set xingColor = "wuxing-huo" %}
+    {% elif jiuXing == '天柱' %}
+        {% set xingColor = "wuxing-jin" %}
+    {% elif jiuXing == '天心' %}
+        {% set xingColor = "wuxing-jin" %}
+    {% elif jiuXing == '天芮' or jiuXing == '天禽' or jiuXing == '天任' %}
+        {% set xingColor = "wuxing-tu" %}
+    {% endif %}
+    <div class="gong-jiuxing {{ xingColor }}">
+        {{ jiuXing if jiuXing else '' }}
+    </div>
+    
+    <!-- 天干 - 右侧显示 -->
+    {% set tianpanColor = "" %}
+    {% if tianPan == '戊' or tianPan == '己' %}
+        {% set tianpanColor = "wuxing-tu" %}
+    {% elif tianPan == '庚' or tianPan == '辛' %}
+        {% set tianpanColor = "wuxing-jin" %}
+    {% elif tianPan == '壬' or tianPan == '癸' %}
+        {% set tianpanColor = "wuxing-shui" %}
+    {% elif tianPan == '丁' or tianPan == '丙' %}
+        {% set tianpanColor = "wuxing-huo" %}
+    {% elif tianPan == '乙' or tianPan == '甲' %}
+        {% set tianpanColor = "wuxing-mu" %}
+    {% endif %}
+    
+    <div class="gong-tiangan {{ tianpanColor }}">{{ tianPan if tianPan else '' }}</div>
+    
+    <!-- 宫位名 - 左下角 -->
+    {% set gongColor = "" %}
+    {% if gongName == '震' or gongName == '巽' %}
+        {% set gongColor = "wuxing-mu" %}
+    {% elif gongName == '离' %}
+        {% set gongColor = "wuxing-huo" %}
+    {% elif gongName == '坤' or gongName == '艮' or gongName == '中' %}
+        {% set gongColor = "wuxing-tu" %}
+    {% elif gongName == '乾' or gongName == '兑' %}
+        {% set gongColor = "wuxing-jin" %}
+    {% elif gongName == '坎' %}
+        {% set gongColor = "wuxing-shui" %}
+    {% endif %}
+    <div class="gong-gongname {{ gongColor }}">{{ gongName if gongName else '' }}</div>
+    
+    <!-- 宫位数字 - 中下位置 -->
+    <div class="gong-number">{{ gongNumber if gongNumber else '' }}</div>
+    
+    <!-- 地盘干 - 右下角 -->
+    {% set dipanColor = "" %}
+    {% if diPan == '戊' or diPan == '己' %}
+        {% set dipanColor = "wuxing-tu" %}
+    {% elif diPan == '庚' or diPan == '辛' %}
+        {% set dipanColor = "wuxing-jin" %}
+    {% elif diPan == '壬' or diPan == '癸' %}
+        {% set dipanColor = "wuxing-shui" %}
+    {% elif diPan == '丁' or diPan == '丙' %}
+        {% set dipanColor = "wuxing-huo" %}
+    {% elif diPan == '乙' or diPan == '甲' %}
+        {% set dipanColor = "wuxing-mu" %}
+    {% endif %}
+    
+    <div class="gong-dipan {{ dipanColor }}">{{ diPan if diPan else '' }}</div>
+</div>

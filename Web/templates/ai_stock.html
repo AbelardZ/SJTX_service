@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI投资研究 · 个股深度分析</title>
+    <script src="/static/js/lib/markdown-it.min.js"></script>
+    <style>
+        :root {
+            /* 升级配色方案：深邃蓝 + 活力红 + 柔和灰背景 */
+            --primary: #1B365D; /* Oxford Blue */
+            --primary-light: #60a5fa;
+            --primary-dark: #1e3a8a;
+            --accent-color: #E63946;  /* Imperial Red */
+            --success: #10b981;
+            --bg-body: #F1F5F9;      /* Slate 100 */
+            --bg-card: #ffffff;
+            --text-main: #1e293b;     /* Slate 800 */
+            --text-muted: #64748b;    /* Slate 500 */
+            --border: #e2e8f0;       /* Slate 200 */
+            --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            --shadow-lg: 0 20px 40px -10px rgba(0,0,0,0.06);
+            --font-serif: 'Georgia', 'Songti SC', 'STSong', serif;
+            --radius-lg: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px 80px;
+        }
+
+        /* Top Bar */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 10px 0;
+        }
+
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+            font-size: 14px;
+        }
+        .nav-link:hover { color: var(--primary); }
+
+        .badge {
+            padding: 6px 12px;
+            background: #dbeafe;
+            color: var(--primary);
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Hero Card - Re-skinned */
+        .header-card {
+            background-color: var(--bg-card);
+            padding: 3.5rem 4rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 3rem;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-card::after {
+            content: '';
+            position: absolute;
+            top: -20%;
+            right: -5%;
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(135deg, var(--primary), transparent);
+            opacity: 0.05;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        
+        /* Remove old top border */
+        .header-card::before { display: none; }
+
+        .header-title {
+            font-family: var(--font-serif);
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--primary);
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+        }
+        
+        .header-title::before {
+             content: '';
+             display: block;
+             width: 4px; 
+             height: 48px;
+             background: var(--accent-color);
+             border-radius: 2px;
+             box-shadow: 0 0 10px rgba(230, 57, 70, 0.4);
+        }
+
+        .desc {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 32px;
+            max-width: 700px;
+            margin-left: 24px; /* Align with text after red bar */
+        }
+
+        /* Forms */
+        .input-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            text-transform: uppercase;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            gap: 6px;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+        .btn-ghost {
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        .btn-ghost:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
+
+        /* Premium Chat Box */
+        .chat-container {
+            border-top: 1px solid var(--border);
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .chat-input-wrapper {
+            position: relative;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center; /* Changed from flex-end to center for single line */
+            padding: 6px 6px 6px 16px;
+        }
+        .chat-input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(27, 54, 93, 0.1); 
+        }
+        .chat-input {
+            flex: 1;
+            border: none;
+            padding: 8px 0;
+            font-size: 15px;
+            resize: none;
+            height: 40px; /* Fixed height for single line input look */
+            background: transparent;
+            font-family: inherit;
+            box-shadow: none !important;
+            line-height: 24px;
+        }
+        .chat-input:focus {
+            box-shadow: none !important;
+            outline: none;
+        }
+        .chat-send-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+        .chat-send-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: scale(1.05);
+        }
+        .chat-send-btn:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+        .chat-send-btn svg {
+            width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2;
+        }
+
+        /* Modules */
+        .module-list {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .module-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        
+        .module-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .module-header {
+            padding: 18px 24px;
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .module-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: #e2e8f0;
+            transition: all 0.3s;
+        }
+        .status-dot.active { background: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.2); }
+        .status-dot.done { background: var(--success); }
+
+        .module-meta {
+            padding: 10px 24px;
+            font-size: 13px;
+            color: var(--text-muted);
+            background: #fcfcfc;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .body-box {
+            padding: 24px;
+            min-height: 120px;
+            max-height: 600px;
+            overflow-y: auto;
+            color: #334155;
+            background: #ffffff;
+        }
+
+        /* Logs */
+        details.log-box {
+            border-top: 1px solid var(--border);
+            background: #1e293b; color: #94a3b8;
+        }
+
+        details.log-box summary {
+            padding: 10px 24px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 1px solid #334155;
+            list-style: none;
+        }
+        details.log-box summary:hover { color: #f8fafc; }
+        
+        .log-content {
+            padding: 16px 24px;
+            max-height: 250px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #cbd5e1;
+            background: #0f172a;
+        }
+
+        /* History Drawer (Side Panel) */
+        #historyDrawer {
+            position: fixed;
+            top: 0; right: -420px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -10px 0 25px rgba(0,0,0,0.1);
+            z-index: 9999;
+            transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex !important;
+            flex-direction: column;
+        }
+        #historyDrawer.open { right: 0; }
+        
+        .drawer-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.2); backdrop-filter: blur(2px);
+            z-index: 9998; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+        .drawer-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: #fcfcfc;
+        }
+
+        /* Markdown */
+        .markdown-body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 15px; line-height: 1.8;
+        }
+        .markdown-body h1, .markdown-body h2 {
+            border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 24px;
+        }
+        .markdown-body h3 {
+            position: relative; padding-left: 12px;
+        }
+        .markdown-body h3::before {
+            content:''; position: absolute; left: 0; top: 6px; bottom: 6px;
+            width: 4px; background: var(--primary); border-radius: 2px;
+        }
+        .markdown-body blockquote {
+            background: #eff6ff; border-left: 4px solid var(--primary); color: #1e40af;
+            padding: 12px 16px; margin: 16px 0; border-radius: 0 8px 8px 0;
+        }
+        .markdown-body code {
+            background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: #0f172a;
+            font-size: 0.9em; border: 1px solid #e2e8f0;
+        }
+
+        @media (max-width: 640px) {
+            .input-grid { grid-template-columns: 1fr; }
+            .container { padding: 20px 16px; }
+            .header-card { padding: 24px; }
+            #historyDrawer { width: 100%; right: -100%; }
+        }
+
+        /* Toggle Switch */
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 44px;
+          height: 24px;
+        }
+        .switch input { 
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #cbd5e1;
+          -webkit-transition: .4s;
+          transition: .4s;
+          border-radius: 34px;
+        }
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 18px;
+          width: 18px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          -webkit-transition: .4s;
+          transition: .4s;
+          border-radius: 50%;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        input:checked + .slider {
+          background-color: var(--primary);
+        }
+        input:focus + .slider {
+          box-shadow: 0 0 1px var(--primary);
+        }
+        input:checked + .slider:before {
+          -webkit-transform: translateX(20px);
+          -ms-transform: translateX(20px);
+          transform: translateX(20px);
+        }
+    </style>
+</head>
+<body>
+<div id="drawerOverlay" class="drawer-overlay" onclick="toggleHistoryDrawer()"></div>
+<div id="historyDrawer">
+    <div class="drawer-header">
+        <span style="font-weight:700; color:#1e293b; font-size:16px;">📜 历史研报档案</span>
+        <button class="drawer-close" onclick="toggleHistoryDrawer()">×</button>
+    </div>
+    <ul id="historyList" class="history-list">
+        <li style="padding: 12px; color:#94a3b8;">载入中...</li>
+    </ul>
+</div>
+
+<div class="container">
+    <div class="topbar">
+        <a href="/" class="nav-link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            返回首页
+        </a>
+        <span class="badge" id="sessionBadge">等待指令</span>
+    </div>
+
+    <section class="header-card">
+        <div class="header-title">AI 股票投资研究</div>
+        <div class="desc">基于大语言模型的深度分析。</div>
+        <div class="input-grid">
+            <div class="input-group">
+                <label>Target Asset</label>
+                <input id="stockName" type="text" placeholder="输入股票名称 " autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label>Ticker / Code</label>
+                <input id="stockCode" type="text" placeholder="股票代码 (选填)" autocomplete="off">
+            </div>
+            <div class="input-group" style="grid-column: 1 / -1; margin-top: 10px; display:flex; gap:12px; align-items: center; justify-content: space-between;">
+               <div style="display:flex; gap:12px; align-items:center;">
+                   <button class="btn btn-ghost" onclick="toggleHistoryDrawer()">
+                       <span>📂 历史档案</span>
+                   </button>
+                   
+                   <div style="display:flex; align-items:center; gap:12px; background:#fff; padding:8px 16px; border:1px solid #e2e8f0; border-radius:8px; height:46px;">
+                       <label class="switch">
+                           <input type="checkbox" id="useRag" onchange="toggleRagModule()">
+                           <span class="slider"></span>
+                       </label>
+                       <span style="font-size:13px; font-weight:600; color:#334155;">启用 RAG 检索</span>
+                   </div>
+               </div>
+               
+               <button class="btn btn-primary" id="btnInit" onclick="startPreprocess()" style="padding: 10px 32px; font-size: 15px; box-shadow: 0 4px 6px -1px rgba(27, 54, 93, 0.2);">
+                   ✨ 开始新探索
+               </button>
+            </div>
+        </div>
+    </section>
+
+    <section class="module-list">
+        <!-- Module 1 -->
+        <article class="module-card" id="card-1">
+            <div class="module-header">
+                <div class="module-title"><span class="status-dot" id="dot-1"></span> 预处理</div>
+                <div class="module-actions">
+                    <button class="btn btn-primary" id="btnPreprocess" onclick="startPreprocess()">开始初始化</button>
+                </div>
+            </div>
+            <div class="module-meta" id="meta-1" style="display:none;"></div>
+            <details class="log-box" open><summary>预处理日志</summary><div class="log-content" id="log-1"></div></details>
+        </article>
+
+        <!-- Module 2 -->
+        <article class="module-card" id="card-2">
+            <div class="module-header">
+                <div class="module-title"><span class="status-dot" id="dot-2"></span> 基本分析</div>
+                <div class="module-actions"><button class="btn btn-ghost section-btn" data-section="2">生成分析</button></div>
+            </div>
+            <div class="module-meta" id="meta-2">状态：等待生成</div>
+            <div class="body-box markdown-body" id="body-2"></div>
+            <details class="log-box"><summary>查看推理日志</summary><div class="log-content" id="log-2"></div></details>
+        </article>
+
+        <!-- Module 3 -->
+        <article class="module-card" id="card-3">
+            <div class="module-header">
+                <div class="module-title"><span class="status-dot" id="dot-3"></span> 大级别分析</div>
+                <div class="module-actions"><button class="btn btn-ghost section-btn" data-section="3">生成分析</button></div>
+            </div>
+            <div class="module-meta" id="meta-3">状态：等待生成</div>
+            <div class="body-box markdown-body" id="body-3"></div>
+            <details class="log-box"><summary>查看推理日志</summary><div class="log-content" id="log-3"></div></details>
+        </article>
+
+        <!-- Module 4 -->
+        <article class="module-card" id="card-4">
+            <div class="module-header">
+                <div class="module-title"><span class="status-dot" id="dot-4"></span> 小级别分析</div>
+                <div class="module-actions"><button class="btn btn-ghost section-btn" data-section="4">生成分析</button></div>
+            </div>
+            <div class="module-meta" id="meta-4">状态：等待生成</div>
+            <div class="body-box markdown-body" id="body-4"></div>
+            <details class="log-box"><summary>查看推理日志</summary><div class="log-content" id="log-4"></div></details>
+        </article>
+
+        <!-- Module 5 -->
+        <article class="module-card" id="card-5">
+            <div class="module-header">
+                <div class="module-title"><span class="status-dot" id="dot-5"></span> 资金分析</div>
+                <div class="module-actions"><button class="btn btn-ghost section-btn" data-section="5">生成分析</button></div>
+            </div>
+            <div class="module-meta" id="meta-5">状态：等待生成</div>
+            <div class="body-box markdown-body" id="body-5"></div>
+            <details class="log-box"><summary>查看推理日志</summary><div class="log-content" id="log-5"></div></details>
+        </article>
+
+        <!-- Module 6 -->
+        <article class="module-card" id="card-6">
+            <div class="module-header">
+                <div class="module-title"><span class="status-dot" id="dot-6"></span> 投资策略</div>
+                <div class="module-actions"><button class="btn btn-ghost section-btn" data-section="6">生成分析</button></div>
+            </div>
+            <div class="module-meta" id="meta-6">状态：等待生成</div>
+            <div class="body-box markdown-body" id="body-6"></div>
+            <details class="log-box"><summary>查看推理日志</summary><div class="log-content" id="log-6"></div></details>
+        </article>
+
+        <!-- Module 7 (Chat) -->
+        <article class="module-card" id="card-7">
+            <div class="module-header">
+                <div class="module-title"><span class="status-dot" id="dot-7"></span> 继续讨论</div>
+            </div>
+            <div class="module-meta" id="meta-7">状态：就绪后可用</div>
+            
+            <!-- Chat History Area -->
+            <div class="body-box markdown-body" id="body-7" style="min-height: 300px; max-height: 600px; background: #fff; border-bottom: none;"></div>
+            
+            <!-- Input Area -->
+            <div class="chat-container">
+                <div class="chat-input-wrapper">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="针对以上报告内容，您可以继续提问(Enter发送)..." disabled autocomplete="off">
+                    <button id="btnChat" class="chat-send-btn" disabled>
+                        <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <details class="log-box"><summary>查看对话日志</summary><div class="log-content" id="log-7"></div></details>
+        </article>
+    </section>
+</div>
+
+    <script>
+        let sessionId = '';
+        const md = window.markdownit ? window.markdownit({ html: true, breaks: true }) : null;
+
+        const badge = document.getElementById('sessionBadge');
+        const historyDrawer = document.getElementById('historyDrawer');
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        
+        function toggleRagModule() {
+            const isRag = document.getElementById('useRag').checked;
+            const card1 = document.getElementById('card-1');
+            if (card1) {
+                card1.style.display = isRag ? 'block' : 'none';
+            }
+        }
+        
+        // Init state on load
+        document.addEventListener('DOMContentLoaded', toggleRagModule);
+
+        function toggleHistoryDrawer() {
+            historyDrawer.classList.toggle('open');
+            drawerOverlay.classList.toggle('open');
+            if (historyDrawer.classList.contains('open')) {
+                loadHistory();
+            }
+        }
+
+        async function loadHistory() {
+            const listEl = document.getElementById('historyList');
+            listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8;">正在加载档案库...</div>';
+            try {
+                const resp = await fetch('/aiagent/stock/history');
+                const data = await resp.json();
+                if (!data.ok) {
+                    listEl.innerHTML = `<div style="padding:16px; color:#ef4444; background:#fef2f2; border-radius:8px;">加载失败: ${data.error}</div>`;
+                    return;
+                }
+                if (!data.reports || data.reports.length === 0) {
+                    listEl.innerHTML = '<div style="padding:24px; text-align:center; color:#94a3b8;">暂无历史报告，请开始新的研究。</div>';
+                    return;
+                }
+                listEl.innerHTML = data.reports.map(r => `
+                    <li class="history-item" onclick="window.open('/aiagent/stock/report/${r.filename}', '_blank')">
+                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-weight:700; color:#0f172a; font-size:14px;">${r.name} <span style="font-weight:400; color:#64748b;">${r.code}</span></span>
+                         </div>
+                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                            <span style="color:#94a3b8;">${r.time}</span>
+                            <span style="color:#3b82f6; font-weight:500;">查看报告 &rarr;</span>
+                         </div>
+                    </li>
+                `).join('');
+            } catch (e) {
+                listEl.innerHTML = `<div style="padding:16px; color:#ef4444;">网络错误</div>`;
+            }
+        }
+
+        function getBody(n) { return document.getElementById(`body-${n}`); }
+        function getLog(n) { return document.getElementById(`log-${n}`); }
+        function getMeta(n) { return document.getElementById(`meta-${n}`); }
+        function getDot(n) { return document.getElementById(`dot-${n}`); }
+
+        function setStatus(n, state) {
+            const dot = getDot(n);
+            if (!dot) return;
+            dot.className = 'status-dot'; 
+            if (state === 'active') dot.classList.add('active');
+            if (state === 'done') dot.classList.add('done');
+        }
+
+        function setEnabled(ok) {
+            document.querySelectorAll('.section-btn').forEach(btn => btn.disabled = !ok);
+            document.getElementById('chatInput').disabled = !ok;
+            document.getElementById('btnChat').disabled = !ok;
+            if (ok) badge.textContent = `会话进行中`;
+        }
+
+        function appendText(el, text) {
+            el.textContent += text;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function createParser(bodyEl, logEl, mode = 'section') {
+            const st = { buffer: '', inBody: mode === 'chat', fullMd: '' };
+            // Ensure bodyEl is cleared if it's new content
+            if (!st.fullMd) st.fullMd = '';
+
+            function route(line) {
+                if (!line) return;
+
+                if (line.includes('[正文开始]')) { st.inBody = true; appendText(logEl, line + '\n'); return; }
+                if (line.includes('[正文结束]')) { st.inBody = false; appendText(logEl, line + '\n'); return; }
+
+                // Check for system/log prefixes
+                if (line.startsWith('[系统]') || line.startsWith('[模块') || line.startsWith('[错误]') || line.startsWith('[对话]') || line.startsWith('[你]')) {
+                    appendText(logEl, line + '\n');
+                    return;
+                }
+
+                if (st.inBody || mode === 'chat') {
+                    st.fullMd += line + '\n';
+                    if (md) {
+                         bodyEl.innerHTML = md.render(st.fullMd);
+                    } else {
+                         bodyEl.textContent = st.fullMd; // Fallback
+                    }
+                    bodyEl.scrollTop = bodyEl.scrollHeight;
+                } else {
+                    appendText(logEl, line + '\n');
+                }
+            }
+
+            return {
+                feed(chunk) {
+                    st.buffer += chunk;
+                    const lines = st.buffer.split('\n');
+                    // Keep the last part in buffer if it doesn't end with newline
+                    // logic simplified: send full line, keep rest
+                    if (chunk.includes('\n')) {
+                        // processing lines
+                        // Re-assemble complete lines
+                    }
+                    // Simple line buffering
+                    // (To avoid complexity, we just append blindly here for stream smoothness, 
+                    // but for markdown rendering we really want blocks. 
+                    // The simplest approach for streaming markdown: append to full string and re-render.)
+                },
+                simpleFeed(text) {
+                     // Split by lines not strictly needed for MD, but needed for log routing
+                     // We will accumulate char by char log routing logic is tricky.
+                     // Simpler approach: if it looks like a tag line, log it. Otherwise content.
+                     if (text.startsWith('[') && text.includes(']')) {
+                         // Likely a control line
+                         route(text);
+                     } else {
+                         // Content
+                         if (st.inBody || mode === 'chat') {
+                            st.fullMd += text;
+                            if (md) bodyEl.innerHTML = md.render(st.fullMd);
+                            else bodyEl.textContent = st.fullMd;
+                            bodyEl.scrollTop = bodyEl.scrollHeight;
+                         } else {
+                             // If not in body and not control line, what is it? Maybe partial log.
+                             // For simplicity in this demo, treat as log if it's pre-body.
+                              appendText(logEl, text);
+                         }
+                     }
+                }
+            }
+        }
+
+        // Improved streaming parser that handles partial chunks better
+        function createSmartParser(bodyEl, logEl, mode) {
+             let inBody = (mode === 'chat');
+             let mdContent = '';
+             let rawBuffer = '';
+
+             return {
+                 push(chunk) {
+                     rawBuffer += chunk;
+                     
+                     // Try to extract complete lines for control tags
+                     let idx;
+                     while ((idx = rawBuffer.indexOf('\n')) !== -1) {
+                         const line = rawBuffer.slice(0, idx).trim();
+                         rawBuffer = rawBuffer.slice(idx + 1);
+                         
+                         if (!line) continue;
+                         
+                         if (line.includes('[正文开始]')) { inBody = true; appendText(logEl, line + '\n'); continue; }
+                         if (line.includes('[正文结束]')) { inBody = false; appendText(logEl, line + '\n'); continue; }
+                         
+                         // Control lines
+                         if (line.startsWith('[系统]') || line.startsWith('[模块') || line.startsWith('[错误]') || line.startsWith('[对话]') || line.startsWith('[你]')) {
+                             appendText(logEl, line + '\n');
+                             continue;
+                         }
+                         
+                         // If we are strictly in log mode (not in body), treat as log
+                         if (!inBody && mode !== 'chat') {
+                             appendText(logEl, line + '\n');
+                         } else {
+                             // It's body content line
+                             mdContent += line + '\n';
+                         }
+                     }
+
+                     // If we are inBody, we also want to display partial content (rawBuffer) 
+                     // BUT re-rendering Markdown on every char is heavy and flickery.
+                     // We render what we have confirmed as content (mdContent).
+                     // We can optimistically append rawBuffer to mdContent for display only?
+                     if (inBody || mode === 'chat') {
+                         const preview = mdContent + rawBuffer;
+                         if (md) bodyEl.innerHTML = md.render(preview);
+                         else bodyEl.textContent = preview;
+                         bodyEl.scrollTop = bodyEl.scrollHeight;
+                     }
+                 },
+                 finish() {
+                     if (rawBuffer.trim()) {
+                         // Flush remainder
+                         if (inBody || mode === 'chat') {
+                             mdContent += rawBuffer;
+                             if (md) bodyEl.innerHTML = md.render(mdContent);
+                             else bodyEl.textContent = mdContent;
+                         } else {
+                             appendText(logEl, rawBuffer);
+                         }
+                     }
+                 }
+             };
+        }
+
+        async function streamRequest(url, payload, bodyEl, logEl, buttonEl, mode = 'section') {
+            if (buttonEl) buttonEl.disabled = true;
+
+            const parser = createSmartParser(bodyEl, logEl, mode);
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!resp.ok) {
+                let msg = `请求失败: ${resp.status}`;
+                try { const j = await resp.json(); if (j.error) msg = j.error; } catch (_) {}
+                appendText(logEl, `[错误] ${msg}\n`);
+                if (buttonEl) buttonEl.disabled = false;
+                return;
+            }
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                parser.push(decoder.decode(value, { stream: true }));
+            }
+            parser.finish();
+
+            if (buttonEl) buttonEl.disabled = false;
+        }
+
+        async function startPreprocess(silent = false) {
+            const name = document.getElementById('stockName').value.trim();
+            const code = document.getElementById('stockCode').value.trim();
+            
+            // Handle both buttons
+            const btnInit = document.getElementById('btnInit');
+            const btnCard = document.getElementById('btnPreprocess');
+
+            const log = getLog(1);
+
+            if (!silent) {
+                log.textContent = '';
+                setEnabled(false);
+                if (btnInit) { btnInit.disabled = true; btnInit.innerHTML = '✨ 初始化中...'; }
+                if (btnCard) { btnCard.disabled = true; btnCard.textContent = '初始化中...'; }
+            }
+
+            if (!name) {
+                const msg = '[错误] 请先输入股票名称\n';
+                if (!silent) appendText(log, msg);
+                
+                if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重试预处理'; }
+                return false;
+            }
+
+            const useRag = document.getElementById('useRag').checked;
+
+            try {
+                const resp = await fetch('/aiagent/stock/preprocess', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stock_name: name, stock_code: code, days: 365, use_rag: useRag })
+                });
+
+                const data = await resp.json();
+                if (!resp.ok || !data.ok) {
+                    if (!silent) appendText(log, `[错误] ${data.error || '预处理失败'}\n`);
+                     if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                     if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重试预处理'; }
+                    return false;
+                }
+
+                sessionId = data.session_id;
+                if (!silent) appendText(log, (data.logs || []).join('\n') + '\n');
+                
+                // Show logs if success
+                setStatus(1, 'done');
+                
+                getMeta(7).textContent = `会话已就绪：${data.stock_name}(${data.stock_code})`;
+                [2,3,4,5,6].forEach(i => getMeta(i).textContent = '可开始生成');
+
+                setEnabled(true);
+                
+                // Reset buttons
+                if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重新处理'; }
+                
+                // Scroll to modules if RAG is off (since Module 1 is hidden) and not silent
+                if (!useRag && !silent) {
+                   const card2 = document.getElementById('card-2');
+                   if(card2) card2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+
+                return true;
+                
+            } catch (ex) {
+                if (!silent) appendText(log, `[错误] 网络异常: ${ex}\n`);
+                if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重试预处理'; }
+                return false;
+            }
+        }
+
+        
+        document.querySelectorAll('.section-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                // Auto Init if needed
+                if (!sessionId) {
+                     const ok = await startPreprocess(true);
+                     if (!ok) {
+                         alert("请先输入 Target Asset (股票名称) 以开始分析");
+                         return;
+                     }
+                }
+
+                const n = Number(btn.dataset.section);
+                const body = getBody(n);
+                const log = getLog(n);
+                const meta = getMeta(n);
+
+                body.innerHTML = '';
+                log.textContent = '';
+                meta.textContent = '正在深入分析中...';
+                setStatus(n, 'active');
+
+                await streamRequest(`/aiagent/stock/section/${n}/stream`, { session_id: sessionId }, body, log, btn, 'section');
+                
+                meta.textContent = '分析完成';
+                setStatus(n, 'done');
+            });
+        });
+
+        document.getElementById('btnChat').addEventListener('click', async () => {
+            // Auto Init if needed for chat too
+            if (!sessionId) {
+                 const ok = await startPreprocess(true);
+                 if (!ok) {
+                     alert("请先输入 Target Asset (股票名称) 以开始对话");
+                     return;
+                 }
+            }
+
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const body = getBody(7);
+            const log = getLog(7);
+            const btn = document.getElementById('btnChat');
+
+            setStatus(7, 'active');
+            appendText(log, `\n[你] ${msg}\n`);
+            input.value = '';
+            await streamRequest('/aiagent/stock/chat/stream', { session_id: sessionId, message: msg }, body, log, btn, 'chat');
+            setStatus(7, 'done');
+        });
+
+        // Add Enter key support
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('btnChat').click();
+            }
+        });
+    </script>
+</body>
+</html>
