@@ -19,11 +19,6 @@ services:
       - PYTHONUNBUFFERED=1  # 确保日志实时输出
       - FLASK_APP=Web/app.py
       - ARK_API_KEY=887e6232-8ea0-4d68-89ad-6dc1826ec0c3
-      - LIUYAO_LOCAL_DB_HOST=100.75.180.70
-      - LIUYAO_LOCAL_DB_USER=inv_zhy
-      - LIUYAO_LOCAL_DB_PASSWORD=zhy20050112
-      - LIUYAO_LOCAL_DB_NAME=LiuYaoDB
-      - LIUYAO_CLOUD_SQLITE_PATH=/app/data/liuyao_cloud.db
     
     # 资源限制 (服务器是 4G 内存，给 3G 比较充裕)
     deploy:

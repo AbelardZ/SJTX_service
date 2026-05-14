@@ -9,6 +9,7 @@ import sys
 import sqlite3
 import pymysql
 import traceback
+from collections import deque
 
 # Ensure classifier modules path is available
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +37,8 @@ except ImportError:
 
 HOME_PC_IP = "100.75.180.70"
 DB_PATH = os.path.join(current_dir, "news_buffer.db")
+TABLE_DATE_RE = re.compile(r"^telegraph_(\d{4})_(\d{2})_(\d{2})(?:_.*)?$")
+TABLE_DATE_RE_COMPACT = re.compile(r"^telegraph_(\d{8})(?:_.*)?$")
 
 # Initialize classifier lazily
 _classifier = None
@@ -56,6 +59,20 @@ def get_classifier():
     return _classifier
 
 seen_ids = set()
+seen_id_queue = deque()
+MAX_SEEN_IDS = 300000
+
+
+def remember_seen_id(item_id):
+    """记录已处理 ID，并限制内存占用。"""
+    if item_id in seen_ids:
+        return
+    seen_ids.add(item_id)
+    seen_id_queue.append(item_id)
+
+    while len(seen_id_queue) > MAX_SEEN_IDS:
+        old_id = seen_id_queue.popleft()
+        seen_ids.discard(old_id)
 
 def _map_to_other(label):
     if not label: return '其它'
@@ -107,6 +124,53 @@ def get_sqlite_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def cleanup_sqlite_retention(conn, keep_days=5):
+    """仅保留最近 keep_days 个交易逻辑日的 telegraph_* 表。"""
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'telegraph_%'")
+    table_names = [r[0] for r in cur.fetchall()]
+    if not table_names:
+        return []
+
+    date_to_tables = {}
+    for name in table_names:
+        m = TABLE_DATE_RE.match(name)
+        if m:
+            d = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        else:
+            m2 = TABLE_DATE_RE_COMPACT.match(name)
+            if not m2:
+                continue
+            compact = m2.group(1)
+            d = f"{compact[0:4]}-{compact[4:6]}-{compact[6:8]}"
+        date_to_tables.setdefault(d, []).append(name)
+
+    if len(date_to_tables) <= keep_days:
+        return []
+
+    sorted_dates = sorted(date_to_tables.keys(), reverse=True)
+    keep_set = set(sorted_dates[:keep_days])
+    drop_tables = []
+    for d, tables in date_to_tables.items():
+        if d not in keep_set:
+            drop_tables.extend(tables)
+
+    for t in drop_tables:
+        cur.execute(f"DROP TABLE IF EXISTS `{t}`")
+
+    # 同步清理 AI 报告缓存表（若存在）
+    try:
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='news_agent_reports'")
+        if cur.fetchone():
+            keep_dates_csv = ",".join([f"'{d}'" for d in sorted_dates[:keep_days]])
+            cur.execute(f"DELETE FROM news_agent_reports WHERE report_date NOT IN ({keep_dates_csv})")
+    except Exception as e:
+        print(f"[CLEANUP WARN] news_agent_reports cleanup failed: {e}")
+
+    conn.commit()
+    return drop_tables
 
 def sync_worker():
     """Background worker to sync from local SQLite to remote MySQL"""
@@ -226,6 +290,7 @@ def main():
     # Start sync thread
     t = threading.Thread(target=sync_worker, daemon=True)
     t.start()
+    last_cleanup_at = 0
     
     while True:
         try:
@@ -295,7 +360,7 @@ def main():
                         
                         if cursor.rowcount > 0:
                             saved_count += 1
-                            seen_ids.add(item['id'])
+                            remember_seen_id(item['id'])
                             
                     except Exception as e:
                         print(f"[SAVE ERROR] Item {item.get('id')}: {e}")
@@ -304,6 +369,19 @@ def main():
                 conn.close()
                 if saved_count > 0:
                     print(f"[STORE] Saved {saved_count} new items to SQLite.")
+
+            # 4. Retention cleanup: 自动只保留最近5天
+            now_ts = time.time()
+            if now_ts - last_cleanup_at > 1800:
+                try:
+                    conn = get_sqlite_conn()
+                    dropped = cleanup_sqlite_retention(conn, keep_days=5)
+                    conn.close()
+                    if dropped:
+                        print(f"[CLEANUP] Dropped old tables: {len(dropped)}")
+                except Exception as ce:
+                    print(f"[CLEANUP ERROR] {ce}")
+                last_cleanup_at = now_ts
             
             time.sleep(random.randint(20, 40))
             
@@ -312,4 +390,66 @@ def main():
             time.sleep(10)
 
 if __name__ == "__main__":
+    # Start NewsAgent worker thread
+    try:
+        from newsagent.agent_worker import run_job
+        def agent_monitor_loop():
+            # Initial Run
+            try:
+                print("[AIAGENT] Initializing NewsAI Agent...")
+                run_job() # Initial run for current/last period
+            except Exception as ae:
+                print(f"[AIAGENT INIT ERROR] {ae}")
+
+            # 记录当日每个触发点是否已执行，避免跨天被错误去重
+            triggered_keys = set()
+
+            # 触发点: 在报告期结束时触发对应报告
+            trigger_points = [
+                ("09:30", "overnight"),
+                ("11:30", "morning"),
+                ("13:00", "noon"),
+                ("15:00", "afternoon"),
+            ]
+
+            print("[AIAGENT] NewsAI Agent monitor thread started.")
+            while True:
+                now = datetime.datetime.now()
+
+                # 清理两天前的 key，防止集合无限增长
+                if len(triggered_keys) > 40:
+                    today = now.date()
+                    keep = set()
+                    for key in triggered_keys:
+                        try:
+                            d = datetime.datetime.strptime(key.split("|")[0], "%Y-%m-%d").date()
+                            if (today - d).days <= 1:
+                                keep.add(key)
+                        except Exception:
+                            pass
+                    triggered_keys = keep
+
+                for hhmm, period in trigger_points:
+                    h, m = map(int, hhmm.split(":"))
+                    target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                    delta = (now - target).total_seconds()
+
+                    # 在触发点后的 0~89 秒内执行一次，避免线程漂移错过
+                    if 0 <= delta < 90:
+                        key = f"{now.date().isoformat()}|{period}|{hhmm}"
+                        if key not in triggered_keys:
+                            try:
+                                print(f"[AIAGENT] Triggering job for {period} at {hhmm}")
+                                run_job(period)
+                            except Exception as ae:
+                                print(f"[AIAGENT ERROR] {ae}")
+                            triggered_keys.add(key)
+
+                time.sleep(10)
+        
+        agent_thread = threading.Thread(target=agent_monitor_loop, daemon=True)
+        agent_thread.start()
+    except Exception as e:
+        print(f"[AIAGENT SETUP ERROR] {e}")
+
     main()

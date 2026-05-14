@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-theme.css') }}?v=2">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时消息流 - 神机天象</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=1.2">
+    <!-- Synchronous Global Theme Script for preventing flash -->
+    <script src="{{ url_for('static', filename='js/theme.js') }}?v=2"></script>
+    <style>
+        :root {
+            /* Dark Theme (Default to match global) */
+            --primary-color: #60a5fa;
+            --accent-color: #f87171;
+            --bg-color: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            --bg-input: #334155;
+            --radius-md: 8px;
+            --radius-lg: 16px;
+            --font-serif: 'Georgia', 'Songti SC', 'STSong', serif;
+        }
+
+        [data-theme="light"] {
+            /* Light Theme Overrides */
+            --primary-color: #1B365D; /* Oxford Blue */
+            --accent-color: #E63946;  /* Imperial Red */
+            --bg-color: #F1F5F9;      /* Slate 100 */
+            --bg-card: #ffffff;
+            --text-main: #1e293b;     /* Slate 800 */
+            --text-secondary: #64748b;/* Slate 500 */
+            --border-color: #e2e8f0;  /* Slate 200 */
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --bg-input: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .header {
+            background-color: var(--bg-card);
+            padding: 3.5rem 4rem;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            top: -20%;
+            right: -5%;
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(135deg, var(--primary-color), transparent);
+            opacity: 0.05;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header h1 {
+            font-family: var(--font-serif);
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+        }
+        
+        .header h1::before {
+             content: '';
+             display: block;
+             width: 4px; /* 变细 */
+             height: 100%; /* 拉长 */
+             min-height: 48px;
+             background: var(--accent-color);
+             border-radius: 2px;
+             box-shadow: 0 0 10px rgba(230, 57, 70, 0.4); /* 发光效果 */
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-left: 2px;
+        }
+
+        .trading-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 4px;
+        }
+
+        .date-display {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: white;
+            background-color: var(--accent-color);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .nav-link {
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            background-color: var(--bg-color);
+        }
+
+        .filters-section {
+            background-color: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+
+        .filters-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
+        }
+        
+        .filter-row:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .filter-category-label {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-right: 8px;
+            min-width: 80px;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: var(--bg-input);
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .filter-category-label:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .filter-category-label.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .filter-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-input);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .filter-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .feed-container {
+            background-color: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            min-height: 400px;
+        }
+
+        .ai-summary-container {
+            background-color: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 24px;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ai-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .ai-content {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-main);
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+            white-space: normal;
+        }
+
+        .ai-content h1, .ai-content h2, .ai-content h3 {
+            margin: 0.8rem 0 0.4rem;
+            line-height: 1.4;
+        }
+
+        .ai-content p {
+            margin: 0.5rem 0;
+        }
+
+        .ai-content ul, .ai-content ol {
+            margin: 0.5rem 0 0.5rem 1.2rem;
+        }
+
+        .ai-content code {
+            background: rgba(127,127,127,0.16);
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+            font-family: Menlo, Consolas, monospace;
+        }
+
+        .ai-content pre {
+            background: rgba(127,127,127,0.16);
+            padding: 0.7rem;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .period-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .period-tab {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .period-tab.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        @media (max-width: 992px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+            .ai-summary-container {
+                position: static;
+                order: -1;
+            }
+        }
+
+        .feed-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .empty-state::before {
+            content: '📭';
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .telegraph-item {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .telegraph-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .telegraph-item.new-item {
+            animation: highlightNew 2s ease-out;
+            border-left: 3px solid var(--accent-color);
+        }
+
+        @keyframes highlightNew {
+            0% { background-color: rgba(192, 57, 43, 0.1); }
+            100% { background-color: var(--bg-input); }
+        }
+
+        .item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.8rem;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        /* 标签风格 */
+        .item-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            /* 默认 */
+            background: var(--bg-color); 
+            color: var(--text-secondary); 
+            border: 1px solid var(--border-color);
+        }
+
+        /* 蓝色系 */
+        .item-label.公司公告, .item-label.行业消息, .item-label.行业数据, .item-label.重要主体动态 {
+            background: #e3f2fd; color: #1565c0; border-color: #bbdefb;
+        }
+        /* 黄色系 */
+        .item-label.国内一般政策, .item-label.国内政府动向, .item-label.国内政治动态, 
+        .item-label.国内一般指导, .item-label.重要国家内政 {
+            background: #fff3e0; color: #ef6c00; border-color: #ffe0b2;
+        }
+        /* 绿色系 */
+        .item-label.金融部门事务, .item-label.国际金融政策, .item-label.交易提示, .item-label.机构观点和策略 {
+            background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9;
+        }
+        /* 紫色系 */
+        .item-label.国内宏观数据, .item-label.国际宏观数据 {
+            background: #ede7f6; color: #4527a0; border-color: #d1c4e9;
+        }
+        /* 红色系 */
+        .item-label.一般国际事务, .item-label.国际一般政策, .item-label.地缘政治动态 {
+            background: #fce4ec; color: #c2185b; border-color: #f8bbd0;
+        }
+        /* 科技 */
+        .item-label.科学技术前沿动态 {
+            background: #e0f2f1; color: #00695c; border-color: #b2dfdb;
+        }
+        /* 其它 */
+        .item-label.自然事件, .item-label.社会事件, .item-label.新闻集合, .item-label.其它, .item-label.其他, .item-label.未分类 {
+            background: #f5f5f5; color: #424242; border-color: #e0e0e0;
+        }
+
+        .item-time {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .item-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .item-content {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .status-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .status-indicator.connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .status-indicator.disconnected {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .status-indicator::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header { padding: 1rem; flex-direction: column; align-items: flex-start; gap: 1rem; }
+            .header-content { width: 100%; }
+            .nav-link { width: 100%; text-align: center; }
+            .feed-container { padding: 1rem; }
+            .telegraph-item { padding: 1rem; }
+            .item-header { flex-direction: column; align-items: flex-start; }
+            .status-indicator { top: auto; bottom: 10px; right: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <h1>实时消息流推送</h1>
+                <p>Real-Time Message Stream Push</p>
+                <div class="trading-status">
+                    <div class="date-display">{{ trading_status.date }}</div>
+                    <div class="status-badge" data-status-color="{{ trading_status.status_color }}">
+                        {{ trading_status.status }}
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="/" class="nav-link">返回首页</a>
+            </div>
+        </div>
+
+        <div class="filters-section">
+            <div class="filters-title">分类筛选</div>
+            <div class="filter-buttons" id="label-filters"></div>
+        </div>
+
+        <div class="main-layout">
+            <div class="feed-container">
+                <div class="feed-title">
+                    <span>消息流</span>
+                    <select id="date-select" style="margin-left: auto; font-size: 0.8rem; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main);">
+                        <option value="">加载日期中...</option>
+                    </select>
+                </div>
+                <div class="period-tabs" id="period-tabs">
+                    <div class="period-tab active" data-period="all">全部</div>
+                    <div class="period-tab" data-period="morning">Morning</div>
+                    <div class="period-tab" data-period="noon">Noon</div>
+                    <div class="period-tab" data-period="afternoon">Afternoon</div>
+                    <div class="period-tab" data-period="overnight">Overnight</div>
+                </div>
+                <div id="feed" data-labelgroups='{{ label_groups|tojson }}' data-initial='{{ initial|tojson }}'></div>
+            </div>
+            
+            <div class="ai-summary-container">
+                <div class="ai-title">
+                    <span> AI 智能摘要</span>
+                    <span id="ai-period-badge" style="background: var(--accent-color); color:white; font-size: 0.7rem; padding: 2px 6px; border-radius: 8px; margin-left: 8px; font-weight: normal;">最新</span>
+                </div>
+                <div id="ai-content" class="ai-content">
+                    <div class="empty-state">正在加载 AI 分析报告...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-indicator connected" id="status-indicator">实时连接</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <script>
+        const feed = document.getElementById('feed');
+        const labelFiltersWrap = document.getElementById('label-filters');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusBadge = document.querySelector('.status-badge');
+        
+        // 从后端获取分组数据
+        const LABEL_GROUPS = JSON.parse(feed.dataset.labelgroups);
+        let currentFilter = JSON.parse(feed.dataset.initial); 
+        const allItems = [];
+        const itemIdSet = new Set();
+        const MAX_ITEMS = 1500;
+        const MAX_RENDER_ITEMS = 300;
+
+        // 设置状态徽章颜色
+        if (statusBadge) {
+            const statusColor = statusBadge.dataset.statusColor;
+            statusBadge.style.backgroundColor = statusColor;
+        }
+
+        const dateSelect = document.getElementById('date-select');
+
+        function loadDateOptions() {
+            fetch('/monitor/telegraph/dates')
+                .then(res => res.json())
+                .then(dates => {
+                    if (!Array.isArray(dates) || dates.length === 0) {
+                        dateSelect.innerHTML = '<option value="">无可用日期</option>';
+                        return;
+                    }
+                    dateSelect.innerHTML = '';
+                    dates.forEach((d, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = d;
+                        opt.textContent = d;
+                        if (idx === 0) opt.selected = true;
+                        dateSelect.appendChild(opt);
+                    });
+                    loadRealtimeData();
+                    fetchAiReport(currentTimeFilter === 'all' ? '' : currentTimeFilter);
+                })
+                .catch(() => {
+                    dateSelect.innerHTML = '<option value="">日期加载失败</option>';
+                });
+        }
+
+        function loadRealtimeData() {
+            const selectedDate = dateSelect && dateSelect.value ? dateSelect.value : '';
+            let initUrl = '/monitor/telegraph/init';
+            if (selectedDate) {
+                initUrl += `?date=${encodeURIComponent(selectedDate)}`;
+            }
+            fetch(initUrl)
+                .then(res => res.json())
+                .then(data => {
+                    // 清空当前 items 防止切换天数时重复
+                    allItems.length = 0; 
+                    data.forEach(item => handleIncoming(item, true));
+                    // Initial render
+                    rerenderFiltersAndItems();
+                    
+                    // 2. Start Stream (保持实时推送)
+                    if (!window.evtSource) {
+                        window.evtSource = new EventSource('/monitor/telegraph/stream');
+                        window.evtSource.onmessage = function(e) {
+                             const item = JSON.parse(e.data);
+                             handleIncoming(item, false);
+                        };
+                        window.evtSource.onerror = function() {
+                            statusIndicator.className = 'status-indicator disconnected';
+                            statusIndicator.textContent = '连接中断';
+                        };
+                        window.evtSource.onopen = function() {
+                            statusIndicator.className = 'status-indicator connected';
+                            statusIndicator.textContent = '实时连接';
+                        };
+                    }
+                })
+                .catch(err => {
+                    console.error("Init failed", err);
+                    feed.innerHTML = '<div class="empty-state">无法加载数据</div>';
+                });
+        }
+
+        // 监听天数切换
+        if (dateSelect) {
+            dateSelect.addEventListener('change', () => {
+                feed.innerHTML = '<div class="empty-state">正在重新加载数据...</div>';
+                loadRealtimeData();
+                fetchAiReport(currentTimeFilter === 'all' ? '' : currentTimeFilter);
+            });
+        }
+
+        function clearFilters(){
+            while(labelFiltersWrap.firstChild) labelFiltersWrap.removeChild(labelFiltersWrap.firstChild);
+        }
+
+        function buildFilters(){
+           // 1. 全部显示按钮
+           const allRow = document.createElement('div');
+           allRow.className = 'filter-row';
+           const allBtn = document.createElement('button');
+           allBtn.className = `filter-category-label ${currentFilter === '全部' ? 'active' : ''}`;
+           allBtn.textContent = '全部显示';
+           allBtn.style.width = '100%'; 
+           allBtn.onclick = () => {
+                currentFilter = '全部'; // Reset to '全部' (string)
+                rerenderFiltersAndItems();
+           };
+           allRow.appendChild(allBtn);
+           labelFiltersWrap.appendChild(allRow);
+
+           // 2. 按分组渲染行
+            LABEL_GROUPS.forEach(group => {
+                const row = document.createElement('div');
+                row.className = 'filter-row';
+
+                // 2.1 分类标题
+                const categoryBtn = document.createElement('button');
+                // 判断当前是否选中了该组
+                const isGroupSelected = Array.isArray(currentFilter) && 
+                                        currentFilter.length === group.tags.length && 
+                                        group.tags.every(t => currentFilter.includes(t));
+                
+                categoryBtn.className = `filter-category-label ${isGroupSelected ? 'active' : ''}`;
+                categoryBtn.textContent = group.name;
+                categoryBtn.title = "点击筛选此类全部";
+                categoryBtn.onclick = () => {
+                    currentFilter = group.tags; 
+                    rerenderFiltersAndItems();
+                };
+                row.appendChild(categoryBtn);
+
+                // 2.2 具体标签按钮
+                group.tags.forEach(tag => {
+                   const btn = document.createElement('button');
+                   // 判断选中状态
+                   const isActive = (currentFilter === tag); 
+                   
+                   btn.className = `filter-btn ${isActive ? 'active' : ''}`;
+                   btn.textContent = tag;
+                   btn.onclick = () => {
+                       currentFilter = tag;
+                       rerenderFiltersAndItems();
+                   };
+                   row.appendChild(btn);
+                });
+
+                labelFiltersWrap.appendChild(row);
+            });
+        }
+        
+        function rerenderFiltersAndItems() {
+            clearFilters();
+            buildFilters();
+            rerender();
+        }
+
+        const aiContent = document.getElementById('ai-content');
+        const aiPeriodBadge = document.getElementById('ai-period-badge');
+        const periodTabs = document.getElementById('period-tabs');
+        let currentTimeFilter = 'all';
+
+        function renderMarkdown(mdText) {
+            const text = mdText || '';
+            if (window.marked && window.DOMPurify) {
+                const html = window.marked.parse(text, { breaks: true, gfm: true });
+                return window.DOMPurify.sanitize(html);
+            }
+            // 兜底：无 markdown 库时按纯文本显示
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>');
+        }
+
+        function fetchAiReport(period = '') {
+            aiContent.innerHTML = '<div class="empty-state">正在加载 AI 分析报告...</div>';
+            let url = '/monitor/telegraph/report';
+            const params = [];
+            if (period && period !== 'all') params.push(`period=${encodeURIComponent(period)}`);
+            if (dateSelect && dateSelect.value) params.push(`date=${encodeURIComponent(dateSelect.value)}`);
+            if (params.length) url += `?${params.join('&')}`;
+            
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.ok) {
+                        aiContent.innerHTML = renderMarkdown(data.report);
+                        aiPeriodBadge.textContent = data.period.toUpperCase();
+                    } else {
+                        aiContent.innerHTML = `<div class="empty-state">${data.msg || '暂无该时段报告'}</div>`;
+                        aiPeriodBadge.textContent = 'NONE';
+                    }
+                })
+                .catch(err => {
+                    aiContent.innerHTML = '<div class="empty-state">加载失败</div>';
+                });
+        }
+
+        // 绑定时间分段点击
+        periodTabs.addEventListener('click', (e) => {
+            const tab = e.target.closest('.period-tab');
+            if (!tab) return;
+            
+            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            currentTimeFilter = tab.dataset.period;
+            rerender();
+            
+            // 同步更新 AI 报告
+            fetchAiReport(currentTimeFilter === 'all' ? '' : currentTimeFilter);
+        });
+
+        function isItemInPeriod(item, period) {
+            if (period === 'all') return true;
+            
+            // 使用 item.ctime (秒级时间戳)
+            const date = new Date(item.ctime * 1000);
+            
+            // 获取小时和分钟（本地时间）
+            const hours = date.getHours();
+            const mins = date.getMinutes();
+            const timeVal = hours * 100 + mins;
+
+            if (period === 'morning') return timeVal >= 930 && timeVal < 1130;
+            if (period === 'noon') return timeVal >= 1130 && timeVal < 1300;
+            if (period === 'afternoon') return timeVal >= 1300 && timeVal < 1500;
+            if (period === 'overnight') {
+                return timeVal >= 1500 || timeVal < 930;
+            }
+            return true;
+        }
+
+        function renderItem(item, appendToBottom=false, isNew=false){
+            if(item.type === 'heartbeat') return;
+
+            // 1. 时间段筛选
+            if (!isItemInPeriod(item, currentTimeFilter)) return;
+
+            // 2. 标签筛选
+            let isVisible = false;
+            if (currentFilter === '全部') {
+                isVisible = true;
+            } else if (Array.isArray(currentFilter)) {
+                if (currentFilter.includes(item.primary_label)) isVisible = true;
+            } else {
+                if (item.primary_label === currentFilter) isVisible = true;
+            }
+
+            if (!isVisible) return false;
+            // ... (rest of renderItem content remains same but I need to include it in newString to be safe)
+            const el = document.createElement('div');
+            el.className = `telegraph-item ${isNew ? 'new-item' : ''}`;
+
+            const ts = item.ctime ? new Date(item.ctime * 1000).toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }) : '';
+
+            el.innerHTML = `
+                <div class="item-header">
+                    <span class="item-label ${item.primary_label || '其它'}">${item.primary_label || '其它'}</span>
+                    <span class="item-time">${ts}</span>
+                </div>
+                <div class="item-title">${item.title || ''}</div>
+                <div class="item-content mobile-fold-text" onclick="this.classList.toggle('expanded')">${(item.content || '').replace(/\n/g, '<br>')}</div>
+            `;
+
+            if(appendToBottom){
+                feed.appendChild(el);
+            } else {
+                feed.insertBefore(el, feed.firstChild);
+            }
+            return true;
+        }
+
+        function handleIncoming(item, isInit=false){
+            if(!item || item.type === 'heartbeat' || item.ping) return;
+            if(item.id === undefined || item.id === null) return;
+
+            // 去重
+            if(itemIdSet.has(item.id)) return;
+            itemIdSet.add(item.id);
+
+            if(isInit){
+                allItems.push(item);
+            } else {
+                allItems.unshift(item);
+                renderItem(item, false, true);
+            }
+
+            if (allItems.length > MAX_ITEMS) {
+                const overflow = allItems.splice(MAX_ITEMS);
+                overflow.forEach(x => itemIdSet.delete(x.id));
+            }
+        }
+        
+        function rerender(){
+             feed.innerHTML = '';
+             let visibleCount = 0;
+             allItems.forEach(item => {
+                 if (visibleCount >= MAX_RENDER_ITEMS) return;
+                 if (isItemInPeriod(item, currentTimeFilter)) {
+                     const rendered = renderItem(item, true);
+                     if (rendered) visibleCount++;
+                 }
+             });
+             if (visibleCount === 0) {
+                 feed.innerHTML = '<div class="empty-state">当前时段无相关消息</div>';
+             }
+        }
+
+        loadDateOptions();
+        
+        // Theme handled globally by theme.js
+    </script>
+</body>
+</html>

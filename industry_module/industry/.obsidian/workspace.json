@@ -1,0 +1,215 @@
+{
+  "main": {
+    "id": "18df1e3bfddf588c",
+    "type": "split",
+    "children": [
+      {
+        "id": "32d4cd9a8dd783a7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "af3c949229350a9b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "通信/通信服务/通信工程及服务.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "通信工程及服务"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "0775970ec2018d26",
+    "type": "split",
+    "children": [
+      {
+        "id": "93a07b338e083039",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "951c1f636e20012f",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "6a010660d8ad4b01",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "bde6d02b1fd6ea1d",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "1b468eed7d1ada8b",
+    "type": "split",
+    "children": [
+      {
+        "id": "0360edc5fa01feeb",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9c862f64a1a0d569",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "电子/半导体/数字芯片设计.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "数字芯片设计 的反向链接列表"
+            }
+          },
+          {
+            "id": "21b4e6d1604a9f6f",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "电子/半导体/数字芯片设计.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "数字芯片设计 的出链列表"
+            }
+          },
+          {
+            "id": "aca2786b5fd23d0f",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "2085a09a2caa247a",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "09241fe2134e16db",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "电子/半导体/数字芯片设计.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "数字芯片设计 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "af3c949229350a9b",
+  "lastOpenFiles": [
+    "通信/通信服务/电信运营商.md",
+    "通信/通信设备/其他通信设备.md",
+    "农林牧渔/养殖业/生猪养殖.md",
+    "农林牧渔/养殖业/肉鸡养殖.md",
+    "农林牧渔/养殖业/其他养殖.md",
+    "农林牧渔/饲料/水产饲料.md",
+    "农林牧渔/饲料/宠物食品.md",
+    "农林牧渔/饲料/畜禽饲料.md",
+    "农林牧渔/动物保健Ⅱ/动物保健Ⅲ.md",
+    "交通运输/铁路公路/铁路运输.md",
+    "交通运输/铁路公路/公交.md",
+    "交通运输/铁路公路/高速公路.md",
+    "交通运输/航空机场/航空运输.md",
+    "交通运输/航空机场/机场.md",
+    "计算机/计算机设备/其他计算机设备.md",
+    "计算机/计算机设备/安防设备.md",
+    "钢铁/普钢/长材.md",
+    "钢铁/普钢/钢铁管材.md",
+    "钢铁/普钢/板材.md",
+    "电子/半导体/半导体材料.md",
+    "电子/半导体/半导体设备.md",
+    "电子/半导体/分立器件.md",
+    "电子/半导体/集成电路封测.md",
+    "电子/半导体/模拟芯片设计.md",
+    "电子/半导体/数字芯片设计.md",
+    "电视广播Ⅲ.md"
+  ]
+}

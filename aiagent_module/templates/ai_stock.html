@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 投资研究 · 个股深度分析</title>
+    <script src="{{ url_for('static', filename='js/lib/markdown-it.min.js') }}"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-theme.css') }}?v=2">
+    <script src="{{ url_for('static', filename='js/theme.js') }}?v=2"></script>
+    <style>
+        :root {
+            --header-height: 64px;
+        }
+        body {
+            margin: 0; 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            background: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .glass-header { 
+            background: var(--panel-bg); 
+            backdrop-filter: blur(12px); 
+            border-bottom: 1px solid var(--border-color); 
+            height: var(--header-height); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 1.5rem; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+        }
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .back-link { color: var(--text-muted); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; transition: color 0.2s; font-weight: 500; }
+        .back-link:hover { color: var(--accent-color); }
+        .brand-title { font-size: 1.1rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; border-left: 1px solid var(--border-color); padding-left: 1rem; margin-left: 0.5rem; }
+        
+        .header-status { padding: 4px 12px; background: var(--accent-glow); color: var(--accent-color); border-radius: 20px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(255,215,0,0.2); }
+
+        .container { max-width: 1300px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+        /* Hero / Input Panel */
+        .control-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-panel::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--accent-color);
+        }
+
+        .panel-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; }
+        .panel-title h1 { margin: 0 0 0.5rem 0; font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
+        .panel-title p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+
+        .input-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+        @media(max-width: 768px) { .input-grid { grid-template-columns: 1fr; } }
+        
+        .input-group label { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; letter-spacing: 0.5px; }
+        .input-control { width: 100%; box-sizing: border-box; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.75rem 1rem; border-radius: 8px; font-size: 1rem; transition: all 0.2s; font-family: inherit; }
+        .input-control:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-glow); }
+
+        .panel-actions { margin-top: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-color); }
+        .action-left { display: flex; align-items: center; gap: 1.5rem; }
+        
+        .toggle-switch { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
+        .toggle-switch input { display: none; }
+        .slider { width: 44px; height: 24px; background: var(--border-color); border-radius: 20px; position: relative; transition: 0.3s; }
+        .slider::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .toggle-switch input:checked + .slider { background: var(--accent-color); }
+        .toggle-switch input:checked + .slider::after { transform: translateX(20px); }
+        .toggle-label { font-size: 0.9rem; font-weight: 600; color: var(--text-main); }
+
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; border: none; font-family: inherit; }
+        .btn-primary { background: var(--accent-color); color: #fff; box-shadow: 0 4px 12px rgba(227, 193, 111, 0.2); }
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(227, 193, 111, 0.3); }
+        .btn-secondary { background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--hover-color); border-color: var(--accent-color); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); transform: none; box-shadow: none; }
+
+        /* Modules Pipeline */
+        .pipeline { display: flex; flex-direction: column; gap: 1.5rem; }
+        
+        .module-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .module-header { padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); background: var(--bg-color); }
+        .module-title { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; color: var(--text-main); }
+        
+        .status-indicator { width: 10px; height: 10px; border-radius: 50%; background: var(--border-color); transition: all 0.3s; }
+        .status-indicator.active { background: var(--accent-color); box-shadow: 0 0 8px var(--accent-color); }
+        .status-indicator.done { background: #10b981; }
+
+        .module-meta { padding: 0.75rem 1.5rem; font-size: 0.8rem; font-family: monospace; color: var(--text-muted); background: var(--panel-bg); border-bottom: 1px solid var(--border-color); }
+        
+        .module-body { padding: 1.5rem; max-height: 500px; overflow-y: auto; background: var(--panel-bg); }
+
+        /* Markdown Styling overrides */
+        .markdown-body { color: var(--text-main); font-size: 0.95rem; line-height: 1.7; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-top: 1.5rem; margin-bottom: 1rem; }
+        .markdown-body h3 { border: none; padding-left: 0.5rem; border-left: 3px solid var(--accent-color); }
+        .markdown-body blockquote { background: var(--bg-color); border-left: 4px solid var(--accent-color); padding: 1rem; margin: 1rem 0; border-radius: 4px; color: var(--text-muted); }
+        .markdown-body code { background: var(--bg-color); padding: 0.2em 0.4em; border-radius: 4px; border: 1px solid var(--border-color); font-family: monospace; color: var(--accent-color); }
+        .markdown-body table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .markdown-body th, .markdown-body td { border: 1px solid var(--border-color); padding: 0.75rem; text-align: left; }
+        .markdown-body th { background: var(--bg-color); }
+
+        /* Logs */
+        .log-box { background: var(--bg-color); border-top: 1px solid var(--border-color); }
+        .log-box summary { padding: 0.75rem 1.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); cursor: pointer; user-select: none; }
+        .log-box summary:hover { color: var(--accent-color); background: var(--hover-color); }
+        .log-content { padding: 1rem 1.5rem; font-family: monospace; font-size: 0.8rem; color: #8b949e; background: #0d1117; max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
+
+        /* Drawer */
+        .drawer { position: fixed; top: 0; right: -450px; width: 400px; max-width: 100vw; height: 100vh; background: var(--panel-bg); border-left: 1px solid var(--border-color); box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 1000; transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; }
+        .drawer.open { right: 0; }
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+        .drawer-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-color); }
+        .drawer-title { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); }
+        .drawer-close { background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; transition: color 0.2s; }
+        .drawer-close:hover { color: #ef4444; }
+        .history-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        .history-list li { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem; cursor: pointer; transition: background 0.2s; }
+        .history-list li:hover { background: var(--hover-color); }
+        .history-list li strong { color: var(--text-main); font-size: 0.95rem; }
+        .history-list li span { color: var(--text-muted); font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="glass-header">
+        <div class="header-left">
+            <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> 回工作台</a>
+            <div class="brand-title"><i class="fas fa-microchip" style="color:var(--accent-color);"></i> AI 投研引擎</div>
+        </div>
+        <div class="header-status" id="sessionBadge">系统待命</div>
+    </header>
+
+    <div class="container">
+        
+        <!-- Control Panel -->
+        <section class="control-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <h1>企业基本面智能萃取</h1>
+                    <p>利用 Agentic RAG 穿透底层研报，执行从大级别到资金流的多维推理闭环。</p>
+                </div>
+            </div>
+
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Target Asset (资产名称)</label>
+                    <input id="stockName" type="text" class="input-control" placeholder="输入企业/资产名称" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label>Ticker / Code (代码选填)</label>
+                    <input id="stockCode" type="text" class="input-control" placeholder="000000.SZ" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="panel-actions">
+                <div class="action-left">
+                    <button class="btn btn-secondary" onclick="toggleHistoryDrawer()">
+                        <i class="fas fa-history"></i> 历史档案
+                    </button>
+                    
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="useRag" onchange="toggleRagModule()">
+                        <span class="slider"></span>
+                        <span class="toggle-label">启用知识库 RAG 检索</span>
+                    </label>
+                </div>
+                
+                <button class="btn btn-primary" id="btnInit" onclick="startPreprocess()">
+                    <i class="fas fa-bolt"></i> 启动深度映射
+                </button>
+            </div>
+        </section>
+
+        <!-- Pipeline -->
+        <section class="pipeline">
+            
+            <!-- Module 1 -->
+            <article class="module-card" id="card-1">
+                <div class="module-header">
+                    <div class="module-title"><div class="status-indicator" id="dot-1"></div> <i class="fas fa-satellite-dish"></i> 节点 1：数据预处理</div>
+                    <button class="btn btn-secondary" id="btnPreprocess" onclick="startPreprocess()"><i class="fas fa-play"></i> 执行</button>
+                </div>
+                <div class="module-meta" id="meta-1" style="display:none;"></div>
+                <details class="log-box" open><summary>引擎日志 [展开]</summary><div class="log-content" id="log-1">Waiting for execution...</div></details>
+            </article>
+
+            <!-- Module 2 -->
+            <article class="module-card" id="card-2">
+                <div class="module-header">
+                    <div class="module-title"><div class="status-indicator" id="dot-2"></div> <i class="fas fa-building"></i> 节点 2：总体基本面</div>
+                    <button class="btn btn-secondary section-btn" data-section="2"><i class="fas fa-play"></i> 萃取</button>
+                </div>
+                <div class="module-meta" id="meta-2">Pipeline status: 待命</div>
+                <div class="module-body markdown-body" id="body-2"></div>
+                <details class="log-box"><summary>推理日志 [展开]</summary><div class="log-content" id="log-2"></div></details>
+            </article>
+
+            <!-- Module 3 -->
+            <article class="module-card" id="card-3">
+                <div class="module-header">
+                    <div class="module-title"><div class="status-indicator" id="dot-3"></div> <i class="fas fa-globe"></i> 节点 3：大级别宏观</div>
+                    <button class="btn btn-secondary section-btn" data-section="3"><i class="fas fa-play"></i> 萃取</button>
+                </div>
+                <div class="module-meta" id="meta-3">Pipeline status: 待命</div>
+                <div class="module-body markdown-body" id="body-3"></div>
+                <details class="log-box"><summary>推理日志 [展开]</summary><div class="log-content" id="log-3"></div></details>
+            </article>
+
+            <!-- Module 4 -->
+            <article class="module-card" id="card-4">
+                <div class="module-header">
+                    <div class="module-title"><div class="status-indicator" id="dot-4"></div> <i class="fas fa-search"></i> 节点 4：小级别量价</div>
+                    <button class="btn btn-secondary section-btn" data-section="4"><i class="fas fa-play"></i> 萃取</button>
+                </div>
+                <div class="module-meta" id="meta-4">Pipeline status: 待命</div>
+                <div class="module-body markdown-body" id="body-4"></div>
+                <details class="log-box"><summary>推理日志 [展开]</summary><div class="log-content" id="log-4"></div></details>
+            </article>
+
+            <!-- Module 5 -->
+            <article class="module-card" id="card-5">
+                <div class="module-header">
+                    <div class="module-title"><div class="status-indicator" id="dot-5"></div> <i class="fas fa-money-bill-wave"></i> 节点 5：资金博弈</div>
+                    <button class="btn btn-secondary section-btn" data-section="5"><i class="fas fa-play"></i> 萃取</button>
+                </div>
+                <div class="module-meta" id="meta-5">Pipeline status: 待命</div>
+                <div class="module-body markdown-body" id="body-5"></div>
+                <details class="log-box"><summary>推理日志 [展开]</summary><div class="log-content" id="log-5"></div></details>
+            </article>
+
+            <!-- Module 6 -->
+            <article class="module-card" id="card-6">
+                <div class="module-header">
+                    <div class="module-title"><div class="status-indicator" id="dot-6"></div> <i class="fas fa-chess-knight"></i> 节点 6：投资策略输出</div>
+                    <button class="btn btn-secondary section-btn" data-section="6"><i class="fas fa-play"></i> 萃取</button>
+                </div>
+                <div class="module-meta" id="meta-6">Pipeline status: 待命</div>
+                <div class="module-body markdown-body" id="body-6"></div>
+                <details class="log-box"><summary>推理日志 [展开]</summary><div class="log-content" id="log-6"></div></details>
+            </article>
+
+        </section>
+    </div>
+
+            <!-- Module 7 / Chat -->
+            <article class="module-card" id="card-7">
+                <div class="module-header">
+                    <div class="module-title"><div class="status-indicator" id="dot-7"></div> <i class="fas fa-comments"></i> 节点 7：连续对话</div>
+                </div>
+                <div class="module-meta" id="meta-7">Pipeline status: 待命</div>
+                <div class="module-body markdown-body" id="body-7"></div>
+                <div style="padding: 1rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="chatInput" class="input-control" placeholder="针对以上报告内容继续提问..." disabled autocomplete="off">
+                        <button id="btnChat" class="btn btn-primary" disabled><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+                <details class="log-box"><summary>推理日志 [展开]</summary><div class="log-content" id="log-7"></div></details>
+            </article>
+
+    <!-- Right Drawer -->
+    <div id="drawerOverlay" class="drawer-overlay" onclick="toggleHistoryDrawer()"></div>
+    <div id="historyDrawer" class="drawer">
+        <div class="drawer-header">
+            <span class="drawer-title"><i class="fas fa-archive"></i> 研报档案库</span>
+            <button class="drawer-close" onclick="toggleHistoryDrawer()">&times;</button>
+        </div>
+        <ul id="historyList" class="history-list">
+            <li style="justify-content:center; align-items:center; color:var(--text-muted);">正在加载远端资产...</li>
+        </ul>
+    </div>
+
+    <script>
+        let sessionId = '';
+        const md = window.markdownit ? window.markdownit({ html: true, breaks: true }) : null;
+
+        const badge = document.getElementById('sessionBadge');
+        const historyDrawer = document.getElementById('historyDrawer');
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        
+        function toggleRagModule() {
+            const isRag = document.getElementById('useRag').checked;
+            const card1 = document.getElementById('card-1');
+            if (card1) {
+                card1.style.display = isRag ? 'block' : 'none';
+            }
+        }
+        
+        // Init state on load
+        document.addEventListener('DOMContentLoaded', toggleRagModule);
+
+        function toggleHistoryDrawer() {
+            historyDrawer.classList.toggle('open');
+            drawerOverlay.classList.toggle('open');
+            if (historyDrawer.classList.contains('open')) {
+                loadHistory();
+            }
+        }
+
+        async function loadHistory() {
+            const listEl = document.getElementById('historyList');
+            listEl.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8;">正在加载档案库...</div>';
+            try {
+                const resp = await fetch('/aiagent/stock/history');
+                const data = await resp.json();
+                if (!data.ok) {
+                    listEl.innerHTML = `<div style="padding:16px; color:#ef4444; background:#fef2f2; border-radius:8px;">加载失败: ${data.error}</div>`;
+                    return;
+                }
+                if (!data.reports || data.reports.length === 0) {
+                    listEl.innerHTML = '<div style="padding:24px; text-align:center; color:#94a3b8;">暂无历史报告，请开始新的研究。</div>';
+                    return;
+                }
+                listEl.innerHTML = data.reports.map(r => `
+                    <li class="history-item" onclick="window.open('/aiagent/stock/report/${r.filename}', '_blank')">
+                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-weight:700; color:#0f172a; font-size:14px;">${r.name} <span style="font-weight:400; color:#64748b;">${r.code}</span></span>
+                         </div>
+                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                            <span style="color:#94a3b8;">${r.time}</span>
+                            <span style="color:#3b82f6; font-weight:500;">查看报告 &rarr;</span>
+                         </div>
+                    </li>
+                `).join('');
+            } catch (e) {
+                listEl.innerHTML = `<div style="padding:16px; color:#ef4444;">网络错误</div>`;
+            }
+        }
+
+        function getBody(n) { return document.getElementById(`body-${n}`); }
+        function getLog(n) { return document.getElementById(`log-${n}`); }
+        function getMeta(n) { return document.getElementById(`meta-${n}`); }
+        function getDot(n) { return document.getElementById(`dot-${n}`); }
+
+        function setStatus(n, state) {
+            const dot = getDot(n);
+            if (!dot) return;
+            dot.className = 'status-dot'; 
+            if (state === 'active') dot.classList.add('active');
+            if (state === 'done') dot.classList.add('done');
+        }
+
+        function setEnabled(ok) {
+            document.querySelectorAll('.section-btn').forEach(btn => btn.disabled = !ok);
+            document.getElementById('chatInput').disabled = !ok;
+            document.getElementById('btnChat').disabled = !ok;
+            if (ok) badge.textContent = `会话进行中`;
+        }
+
+        function appendText(el, text) {
+            el.textContent += text;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function createParser(bodyEl, logEl, mode = 'section') {
+            const st = { buffer: '', inBody: mode === 'chat', fullMd: '' };
+            // Ensure bodyEl is cleared if it's new content
+            if (!st.fullMd) st.fullMd = '';
+
+            function route(line) {
+                if (!line) return;
+
+                if (line.includes('[正文开始]')) { st.inBody = true; appendText(logEl, line + '\n'); return; }
+                if (line.includes('[正文结束]')) { st.inBody = false; appendText(logEl, line + '\n'); return; }
+
+                // Check for system/log prefixes
+                if (line.startsWith('[系统]') || line.startsWith('[模块') || line.startsWith('[错误]') || line.startsWith('[对话]') || line.startsWith('[你]')) {
+                    appendText(logEl, line + '\n');
+                    return;
+                }
+
+                if (st.inBody || mode === 'chat') {
+                    st.fullMd += line + '\n';
+                    if (md) {
+                         bodyEl.innerHTML = md.render(st.fullMd);
+                    } else {
+                         bodyEl.textContent = st.fullMd; // Fallback
+                    }
+                    bodyEl.scrollTop = bodyEl.scrollHeight;
+                } else {
+                    appendText(logEl, line + '\n');
+                }
+            }
+
+            return {
+                feed(chunk) {
+                    st.buffer += chunk;
+                    const lines = st.buffer.split('\n');
+                    // Keep the last part in buffer if it doesn't end with newline
+                    // logic simplified: send full line, keep rest
+                    if (chunk.includes('\n')) {
+                        // processing lines
+                        // Re-assemble complete lines
+                    }
+                    // Simple line buffering
+                    // (To avoid complexity, we just append blindly here for stream smoothness, 
+                    // but for markdown rendering we really want blocks. 
+                    // The simplest approach for streaming markdown: append to full string and re-render.)
+                },
+                simpleFeed(text) {
+                     // Split by lines not strictly needed for MD, but needed for log routing
+                     // We will accumulate char by char log routing logic is tricky.
+                     // Simpler approach: if it looks like a tag line, log it. Otherwise content.
+                     if (text.startsWith('[') && text.includes(']')) {
+                         // Likely a control line
+                         route(text);
+                     } else {
+                         // Content
+                         if (st.inBody || mode === 'chat') {
+                            st.fullMd += text;
+                            if (md) bodyEl.innerHTML = md.render(st.fullMd);
+                            else bodyEl.textContent = st.fullMd;
+                            bodyEl.scrollTop = bodyEl.scrollHeight;
+                         } else {
+                             // If not in body and not control line, what is it? Maybe partial log.
+                             // For simplicity in this demo, treat as log if it's pre-body.
+                              appendText(logEl, text);
+                         }
+                     }
+                }
+            }
+        }
+
+        // Improved streaming parser that handles partial chunks better
+        function createSmartParser(bodyEl, logEl, mode) {
+             let inBody = (mode === 'chat');
+             let mdContent = '';
+             let rawBuffer = '';
+
+             return {
+                 push(chunk) {
+                     rawBuffer += chunk;
+                     
+                     // Try to extract complete lines for control tags
+                     let idx;
+                     while ((idx = rawBuffer.indexOf('\n')) !== -1) {
+                         const line = rawBuffer.slice(0, idx).trim();
+                         rawBuffer = rawBuffer.slice(idx + 1);
+                         
+                         if (!line) continue;
+                         
+                         if (line.includes('[正文开始]')) { inBody = true; appendText(logEl, line + '\n'); continue; }
+                         if (line.includes('[正文结束]')) { inBody = false; appendText(logEl, line + '\n'); continue; }
+                         
+                         // Control lines
+                         if (line.startsWith('[系统]') || line.startsWith('[模块') || line.startsWith('[错误]') || line.startsWith('[对话]') || line.startsWith('[你]')) {
+                             appendText(logEl, line + '\n');
+                             continue;
+                         }
+                         
+                         // If we are strictly in log mode (not in body), treat as log
+                         if (!inBody && mode !== 'chat') {
+                             appendText(logEl, line + '\n');
+                         } else {
+                             // It's body content line
+                             mdContent += line + '\n';
+                         }
+                     }
+
+                     // If we are inBody, we also want to display partial content (rawBuffer) 
+                     // BUT re-rendering Markdown on every char is heavy and flickery.
+                     // We render what we have confirmed as content (mdContent).
+                     // We can optimistically append rawBuffer to mdContent for display only?
+                     if (inBody || mode === 'chat') {
+                         const preview = mdContent + rawBuffer;
+                         if (md) bodyEl.innerHTML = md.render(preview);
+                         else bodyEl.textContent = preview;
+                         bodyEl.scrollTop = bodyEl.scrollHeight;
+                     }
+                 },
+                 finish() {
+                     if (rawBuffer.trim()) {
+                         // Flush remainder
+                         if (inBody || mode === 'chat') {
+                             mdContent += rawBuffer;
+                             if (md) bodyEl.innerHTML = md.render(mdContent);
+                             else bodyEl.textContent = mdContent;
+                         } else {
+                             appendText(logEl, rawBuffer);
+                         }
+                     }
+                 }
+             };
+        }
+
+        async function streamRequest(url, payload, bodyEl, logEl, buttonEl, mode = 'section') {
+            if (buttonEl) buttonEl.disabled = true;
+
+            const parser = createSmartParser(bodyEl, logEl, mode);
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!resp.ok) {
+                let msg = `请求失败: ${resp.status}`;
+                try { const j = await resp.json(); if (j.error) msg = j.error; } catch (_) {}
+                appendText(logEl, `[错误] ${msg}\n`);
+                if (buttonEl) buttonEl.disabled = false;
+                return;
+            }
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                parser.push(decoder.decode(value, { stream: true }));
+            }
+            parser.finish();
+
+            if (buttonEl) buttonEl.disabled = false;
+        }
+
+        async function startPreprocess(silent = false) {
+            const name = document.getElementById('stockName').value.trim();
+            const code = document.getElementById('stockCode').value.trim();
+            
+            // Handle both buttons
+            const btnInit = document.getElementById('btnInit');
+            const btnCard = document.getElementById('btnPreprocess');
+
+            const log = getLog(1);
+
+            if (!silent) {
+                log.textContent = '';
+                setEnabled(false);
+                if (btnInit) { btnInit.disabled = true; btnInit.innerHTML = '✨ 初始化中...'; }
+                if (btnCard) { btnCard.disabled = true; btnCard.textContent = '初始化中...'; }
+            }
+
+            if (!name) {
+                const msg = '[错误] 请先输入股票名称\n';
+                if (!silent) appendText(log, msg);
+                
+                if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重试预处理'; }
+                return false;
+            }
+
+            const useRag = document.getElementById('useRag').checked;
+
+            try {
+                const resp = await fetch('/aiagent/stock/preprocess', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stock_name: name, stock_code: code, days: 365, use_rag: useRag })
+                });
+
+                const data = await resp.json();
+                if (!resp.ok || !data.ok) {
+                    if (!silent) appendText(log, `[错误] ${data.error || '预处理失败'}\n`);
+                     if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                     if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重试预处理'; }
+                    return false;
+                }
+
+                sessionId = data.session_id;
+                if (!silent) appendText(log, (data.logs || []).join('\n') + '\n');
+                
+                // Show logs if success
+                setStatus(1, 'done');
+                
+                getMeta(7).textContent = `会话已就绪：${data.stock_name}(${data.stock_code})`;
+                [2,3,4,5,6].forEach(i => getMeta(i).textContent = '可开始生成');
+
+                setEnabled(true);
+                
+                // Reset buttons
+                if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重新处理'; }
+                
+                // Scroll to modules if RAG is off (since Module 1 is hidden) and not silent
+                if (!useRag && !silent) {
+                   const card2 = document.getElementById('card-2');
+                   if(card2) card2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+
+                return true;
+                
+            } catch (ex) {
+                if (!silent) appendText(log, `[错误] 网络异常: ${ex}\n`);
+                if (btnInit) { btnInit.disabled = false; btnInit.innerHTML = '✨ 开始新探索'; }
+                if (btnCard) { btnCard.disabled = false; btnCard.textContent = '重试预处理'; }
+                return false;
+            }
+        }
+
+        
+        document.querySelectorAll('.section-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                // Auto Init if needed
+                if (!sessionId) {
+                     const ok = await startPreprocess(true);
+                     if (!ok) {
+                         alert("请先输入 Target Asset (股票名称) 以开始分析");
+                         return;
+                     }
+                }
+
+                const n = Number(btn.dataset.section);
+                const body = getBody(n);
+                const log = getLog(n);
+                const meta = getMeta(n);
+
+                body.innerHTML = '';
+                log.textContent = '';
+                meta.textContent = '正在深入分析中...';
+                setStatus(n, 'active');
+
+                await streamRequest(`/aiagent/stock/section/${n}/stream`, { session_id: sessionId }, body, log, btn, 'section');
+                
+                meta.textContent = '分析完成';
+                setStatus(n, 'done');
+            });
+        });
+
+        document.getElementById('btnChat').addEventListener('click', async () => {
+            // Auto Init if needed for chat too
+            if (!sessionId) {
+                 const ok = await startPreprocess(true);
+                 if (!ok) {
+                     alert("请先输入 Target Asset (股票名称) 以开始对话");
+                     return;
+                 }
+            }
+
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const body = getBody(7);
+            const log = getLog(7);
+            const btn = document.getElementById('btnChat');
+
+            setStatus(7, 'active');
+            appendText(log, `\n[你] ${msg}\n`);
+            input.value = '';
+            await streamRequest('/aiagent/stock/chat/stream', { session_id: sessionId, message: msg }, body, log, btn, 'chat');
+            setStatus(7, 'done');
+        });
+
+        // Add Enter key support
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('btnChat').click();
+            }
+        });
+    </script>
+</body>
+</html>
