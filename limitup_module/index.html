@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>涨停分析</title>
+    <link rel="stylesheet" href="/limitup/styles.css?v=refined-20260515" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Limit-up Monitor</p>
+          <h1>涨停分析</h1>
+        </div>
+        <div class="toolbar">
+          <label class="field date-field">
+            <span>日期</span>
+            <select id="dateSelect"></select>
+          </label>
+          <button id="clearFilterButton" class="ghost-button" type="button" hidden>清除筛选</button>
+        </div>
+      </section>
+
+      <section class="trend-panel">
+        <div class="trend-head">
+          <div>
+            <p class="eyebrow">Daily Trend</p>
+            <h2>日间趋势</h2>
+          </div>
+          <div class="range-controls">
+            <div class="range-buttons" role="group" aria-label="趋势区间">
+              <button class="range-button active" type="button" data-range="5">5日</button>
+              <button class="range-button" type="button" data-range="10">10日</button>
+              <button class="range-button" type="button" data-range="30">30日</button>
+              <button class="range-button" type="button" data-range="custom">自定义</button>
+            </div>
+            <div id="customRange" class="custom-range" hidden>
+              <input id="trendStart" type="date" />
+              <span>至</span>
+              <input id="trendEnd" type="date" />
+            </div>
+          </div>
+        </div>
+        <div class="trend-grid">
+          <div class="trend-card">
+            <div class="trend-title">
+              <span>总涨停数量趋势</span>
+              <strong id="trendTotalSummary">-</strong>
+            </div>
+            <div id="totalTrendChart" class="trend-chart"></div>
+          </div>
+          <div class="trend-card">
+            <div class="trend-title">
+              <span>申万一级涨停趋势</span>
+              <strong>Top 5</strong>
+            </div>
+            <div id="industryTrendChart" class="trend-chart"></div>
+          </div>
+          <div class="trend-card">
+            <div class="trend-title">
+              <span>韭研题材涨停趋势</span>
+              <strong>Top 5</strong>
+            </div>
+            <div id="themeTrendChart" class="trend-chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="summary-strip" aria-live="polite">
+        <div>
+          <span class="metric-label">股票数</span>
+          <strong id="totalCount">0</strong>
+        </div>
+        <div>
+          <span class="metric-label">当前范围</span>
+          <strong id="visibleCount">0</strong>
+        </div>
+        <div>
+          <span class="metric-label">最高连板</span>
+          <strong id="maxChain">-</strong>
+        </div>
+        <div>
+          <span class="metric-label">筛选</span>
+          <strong id="activeFilterText">全部</strong>
+        </div>
+      </section>
+
+      <section class="stats-panel">
+        <div class="stat-group">
+          <div class="panel-head">
+            <h2>申万一级涨停数</h2>
+            <span>点击标签筛选</span>
+          </div>
+          <div id="industryStats" class="stat-chips"></div>
+        </div>
+        <div class="stat-group">
+          <div class="panel-head">
+            <h2>韭研题材涨停数</h2>
+            <span>点击标签筛选</span>
+          </div>
+          <div id="themeStats" class="stat-chips"></div>
+        </div>
+      </section>
+
+      <section class="distribution-panel">
+        <div class="panel-head">
+          <h2>题材分布可视化</h2>
+          <span>按当前筛选结果统计</span>
+        </div>
+        <div id="themeDistribution" class="distribution-grid"></div>
+      </section>
+
+      <section class="table-panel">
+        <div id="status" class="status">正在加载数据...</div>
+        <div class="table-wrap">
+          <table>
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="/limitup/app.js"></script>
+  </body>
+</html>

@@ -39,6 +39,10 @@
 - **功能**: A 股实时快讯直播展示，支持分类标签过滤与历史回顾。
 - **逻辑**: 通过 SSE / 轮询从 SQLite 数据库读取 `news_monitor` 生产的分类快讯数据，提供前端实时展示。
 
+### 6. 涨停分析 (`limitup_module/`)
+- **功能**: A 股涨停板数据多维度分析与可视化。
+- **逻辑**: 基于每日涨停 CSV 数据，提供日间趋势图（总涨停数、申万行业分布、韭研题材分布）、涨停股票明细表、行业/题材筛选与排序等功能。
+
 ---
 
 ## 📁 目录结构
@@ -87,6 +91,13 @@ SJTX_service/
 ├── monitor_module/                # 实时快讯展示模块
 │   ├── routes.py                  # Flask 蓝图，快讯 SSE/轮询接口
 │   └── templates/                 # 快讯与历史页面模板
+├── limitup_module/                # 涨停分析模块
+│   ├── routes.py                  # Flask 蓝图，涨停数据 API
+│   ├── server.py                  # 原独立 HTTP 服务器（已整合到蓝图）
+│   ├── index.html                 # 涨停分析前端页面
+│   ├── app.js                     # 前端交互逻辑
+│   ├── styles.css                 # 前端样式
+│   └── data/                      # 每日涨停 CSV 数据
 ├── nginx.conf                     # Nginx 反向代理配置 (SSE 优化)
 └── docker-compose.yml             # Docker 容器化编排 (Host 网络模式)
 ```

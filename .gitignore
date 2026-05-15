@@ -58,6 +58,7 @@ LLM_support/reports/
 LLM_support/saved_reports/
 shortstrategy/cloud_data/
 news_monitor/bert_model_output/
+monitor_module/news_monitor/bert_model_output/
 data/
 
 # VS Code

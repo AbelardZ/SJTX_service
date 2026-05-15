@@ -51,6 +51,7 @@ _MODULES = [
     ('monitor_module', 'monitor_bp'),
     ('monitor_module', 'monitor_history_bp'),
     ('industry_module', 'industry_bp'),
+    ('limitup_module', 'limitup_bp'),
 ]
 
 for module_dir, bp_attr in _MODULES:
