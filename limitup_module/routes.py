@@ -56,7 +56,7 @@ def _read_csv_rows(trade_date: str) -> tuple[list[str], list[dict[str, str]]]:
 @limitup_bp.route("/")
 def index():
     """涨停分析主页面"""
-    return render_template("index.html")
+    return render_template("limitup.html")
 
 
 # ── API 路由 ───────────────────────────────────────────────
