@@ -21,13 +21,3 @@ def index():
     return render_template('index.html', reports=reports)
 
 index = main_bp.route('/')(index)
-
-def limitup_redirect():
-    return redirect(url_for('dailychart.limitup'))
-
-limitup_redirect = main_bp.route('/limitup/')(limitup_redirect)
-
-def limitup_admin_redirect():
-    return redirect(url_for('dailychart.limitup_admin'))
-
-limitup_admin_redirect = main_bp.route('/limitup/admin')(limitup_admin_redirect)
