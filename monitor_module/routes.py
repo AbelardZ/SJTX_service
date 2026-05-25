@@ -10,6 +10,8 @@ import glob
 import re
 from pathlib import Path
 
+from monitor_module.news_monitor.paths import REPORTS_DIR
+
 # ============================================================
 # monitor_bp — 实时电报直播 (SQLite)
 # ============================================================
@@ -20,7 +22,7 @@ LATEST_LIMIT = 500
 
 _MODULE_DIR = Path(__file__).resolve().parent
 BASE_DIR = _MODULE_DIR.parent
-SQLITE_DB_PATH = str(BASE_DIR / 'news_monitor' / 'news_buffer.db')
+SQLITE_DB_PATH = str(_MODULE_DIR / 'news_monitor' / 'news_buffer.db')
 
 LABEL_GROUPS = [
     {'name': '市场金融', 'tags': ['交易提示', '公司公告', '机构观点和策略', '金融部门事务']},
@@ -34,6 +36,7 @@ LABEL_OPTIONS = ['全部'] + [tag for group in LABEL_GROUPS for tag in group['ta
 
 _latest_cache = []
 _last_seen_ids = set()
+_MAX_SEEN_IDS = 100000  # 防止内存无限增长
 _lock = threading.Lock()
 
 class MessageAnnouncer:
@@ -214,6 +217,9 @@ def _poll_function():
                 for r in rows:
                     item = dict(r)
                     if item['id'] not in _last_seen_ids:
+                        # 防止 _last_seen_ids 无限增长导致内存泄漏
+                        if len(_last_seen_ids) >= _MAX_SEEN_IDS:
+                            _last_seen_ids.clear()
                         _last_seen_ids.add(item['id'])
                         new_items.append(item)
                 
@@ -318,7 +324,7 @@ def telegraph_report():
     if period not in ('morning', 'noon', 'afternoon', 'overnight', ''):
         return jsonify({'ok': False, 'msg': 'invalid period'})
 
-    reports_dir = str(BASE_DIR / 'news_monitor' / 'newsagent' / 'saved_reports')
+    reports_dir = str(REPORTS_DIR)
     if not os.path.isdir(reports_dir):
         return jsonify({'ok': False, 'msg': 'report dir not found'})
 

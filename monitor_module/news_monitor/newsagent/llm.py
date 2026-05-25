@@ -1,12 +1,16 @@
-from openai import OpenAI
+"""NewsAgent LLM configuration and helpers."""
+
+from __future__ import annotations
+
 import os
-from datetime import datetime
 
-API_KEY =  'sk-epawyaxfrulzqtpwanuabiytcbdewibpuxbwgrjsbobpuhhx'
-MODEL_NAME = "deepseek-ai/DeepSeek-V3.2-Exp"
+from openai import OpenAI
 
-System_Prompt = 
-'''
+API_KEY = os.getenv("NEWS_AGENT_API_KEY", "sk-epawyaxfrulzqtpwanuabiytcbdewibpuxbwgrjsbobpuhhx")
+MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"
+BASE_URL = "https://api.siliconflow.cn/v1"
+
+SYSTEM_PROMPT = """
 你是我的A股投资研究团队的一员，专门负责追踪和分析新闻消息，
 你将24小时不间断地收到来自其它部门推送的新闻消息，这些新闻按照一定的逻辑被分类:
     {'name': '市场金融', 'tags': ['交易提示', '公司公告', '机构观点和策略', '金融部门事务']},
@@ -21,4 +25,12 @@ morning 9:30-11:30
 noon 11:30-13:00
 afternoon 13:00-15:00
 overnight 15:00-9:30 四个部分。
-'''
+"""
+
+System_Prompt = SYSTEM_PROMPT
+
+
+def build_client() -> OpenAI:
+    if not API_KEY:
+        raise RuntimeError("NEWS_AGENT_API_KEY is not set")
+    return OpenAI(api_key=API_KEY, base_url=BASE_URL)

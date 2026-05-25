@@ -30,7 +30,7 @@ services:
     network_mode: "host"
     
     # 启动命令
-    command: sh -c "pip install --no-cache-dir -r Web/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && python Web/app.py & pip install --no-cache-dir -r news_monitor/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && python news_monitor/main.py & wait"
+    command: sh -c "pip install --no-cache-dir -r Web/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && pip install --no-cache-dir -r monitor_module/news_monitor/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && python Web/app.py"
              
     restart: always
 

@@ -5,11 +5,12 @@ import os
 import re
 import logging
 from monitor_module.news_monitor.config import DB_CONFIG
+from monitor_module.news_monitor.paths import DB_PATH
 
 # --- 配置区 ---
 # 请修改为你的 Tailscale IP
 HOME_PC_IP = "100.75.180.70" 
-LOCAL_DB_FILE = "news_buffer.db"
+LOCAL_DB_FILE = os.path.join("data", "news_buffer.db")
 
 class SQLiteCursorWrapper:
     """让 SQLite 游标兼容 PyMySQL 的 %s 语法"""
@@ -83,8 +84,8 @@ class SQLiteConnectionWrapper:
 
 def get_local_sqlite_conn():
     """获取本地 SQLite 连接 (云端 3 日缓存)"""
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), LOCAL_DB_FILE)
-    conn = sqlite3.connect(db_path)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH))
     return SQLiteConnectionWrapper(conn)
 
 def get_home_mysql_conn():

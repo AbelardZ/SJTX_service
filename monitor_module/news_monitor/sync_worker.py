@@ -6,6 +6,7 @@ import os
 import logging
 from monitor_module.news_monitor.config import DB_CONFIG
 from monitor_module.news_monitor.db_proxy import HOME_PC_IP, LOCAL_DB_FILE
+from monitor_module.news_monitor.paths import DB_PATH
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -18,7 +19,8 @@ def get_remote_conn():
 
 def sync_data():
     """将本地 SQLite 的新数据同步到远程 MySQL"""
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), LOCAL_DB_FILE)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db_path = str(DB_PATH)
     
     if not os.path.exists(db_path):
         return
@@ -131,7 +133,7 @@ def sync_data():
 
 def prune_local_data(days=3):
     """清理本地 SQLite 缓冲，仅保留最近 X 天的数据"""
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), LOCAL_DB_FILE)
+    db_path = str(DB_PATH)
     if not os.path.exists(db_path): return
     
     try:
