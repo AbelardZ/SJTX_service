@@ -8,3 +8,4 @@ lunar_python
 sxtwl
 mysql-connector-python
 pymongo
+openai

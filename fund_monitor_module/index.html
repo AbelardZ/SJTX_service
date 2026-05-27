@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>公募基金重仓股跟踪</title>
+  <link rel="stylesheet" href="styles.css?v=14" />
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <!-- 顶栏 -->
+    <section class="topbar">
+      <div>
+        <p class="eyebrow">Mutual Fund Holdings Tracker</p>
+        <h1>公募基金重仓股跟踪</h1>
+        <p class="subtitle">基于公募基金定期报告披露的持仓股 / 重仓股追踪分析</p>
+      </div>
+      <div class="toolbar">
+        <label class="field">
+          <span>报告期</span>
+          <select id="reportSelect" disabled></select>
+        </label>
+        <label class="field">
+          <span>层级</span>
+          <select id="levelSelect" disabled>
+            <option value="一级">一级行业</option>
+            <option value="二级">二级行业</option>
+            <option value="三级">三级行业</option>
+          </select>
+        </label>
+        <button id="reloadButton" type="button" class="ghost-button">刷新</button>
+      </div>
+    </section>
+
+    <!-- ══════ 全行业概览 ══════ -->
+    <div class="section-header">
+      <span class="section-header-line"></span>
+      <span class="section-header-label">行业总览</span>
+      <span class="section-header-line"></span>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>📊 行业排名</h2>
+        <div class="rank-tabs" role="group" id="industryRankTabs">
+          <button class="rank-tab active" data-metric="持仓市值">持仓市值</button>
+          <button class="rank-tab" data-metric="基金覆盖">基金覆盖</button>
+          <button class="rank-tab" data-metric="持仓占比">持仓占比</button>
+        </div>
+      </div>
+      <div id="industryHoldingChart" class="chart-box"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>📋 行业明细</h2>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div class="rank-tabs" role="group" id="summaryRankTabs">
+            <button class="rank-tab active" data-metric="持仓市值">持仓市值</button>
+            <button class="rank-tab" data-metric="基金覆盖">基金覆盖</button>
+            <button class="rank-tab" data-metric="持仓占比">持仓占比</button>
+          </div>
+          <div class="table-search">
+            <input id="summarySearch" type="text" placeholder="搜索行业…" />
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="summaryTable">
+          <thead></thead>
+          <tbody><tr><td class="empty-state">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    
+    <!-- ══════ 全市场 ══════ -->
+    <div class="section-header">
+      <span class="section-header-line"></span>
+      <span class="section-header-label">持仓全景</span>
+      <span class="section-header-line"></span>
+    </div>
+
+    <section class="panel">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div class="rank-tabs" role="group" id="top300RankTabs">
+            <button class="rank-tab active" data-metric="持股总市值">持仓市值</button>
+            <button class="rank-tab" data-metric="基金覆盖">基金覆盖</button>
+            <button class="rank-tab" data-metric="持仓占比">持仓占比</button>
+          </div>
+          <div class="table-search">
+            <input id="top300Search" type="text" placeholder="代码 / 名称…" />
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="top300Table">
+          <thead></thead>
+          <tbody><tr><td class="empty-state">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+
+    <!-- ══════ 行业内详情 ══════ -->
+    <div class="section-header">
+      <span class="section-header-line"></span>
+      <span class="section-header-label">行业分析</span>
+      <span class="section-header-line"></span>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="industryStockTitle">🏆 股票排名</h2>
+        <div class="rank-tabs" role="group" id="stockRankTabs">
+          <button class="rank-tab active" data-metric="持股总市值">持仓市值</button>
+          <button class="rank-tab" data-metric="基金覆盖">基金覆盖</button>
+          <button class="rank-tab" data-metric="持仓占比">持仓占比</button>
+        </div>
+      </div>
+      <div class="divider-controls">
+        <label class="field">
+          <span>行业</span>
+          <select id="industrySelect" disabled></select>
+        </label>
+        <label class="field search-field">
+          <span>搜索</span>
+          <input id="searchInput" type="search" placeholder="代码 / 名称" disabled />
+        </label>
+      </div>
+      <div id="industryStockChart" class="chart-box"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>📋 股票明细</h2>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span class="section-meta" id="stockTableCount">0 只</span>
+          <div class="table-search">
+            <input id="stockTableSearch" type="text" placeholder="代码 / 名称…" />
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="stockTable">
+          <thead></thead>
+          <tbody><tr><td class="empty-state">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="auto-app.js?v=28"></script>
+</body>
+</html>

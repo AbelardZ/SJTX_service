@@ -18,6 +18,7 @@ services:
       - TZ=Asia/Shanghai
       - PYTHONUNBUFFERED=1  # 确保日志实时输出
       - FLASK_APP=Web/app.py
+      - NEWS_MONITOR_AUTOSTART=0
       - ARK_API_KEY=887e6232-8ea0-4d68-89ad-6dc1826ec0c3
     
     # 资源限制 (服务器是 4G 内存，给 3G 比较充裕)
@@ -30,8 +31,31 @@ services:
     network_mode: "host"
     
     # 启动命令
-    command: sh -c "pip install --no-cache-dir -r Web/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && pip install --no-cache-dir -r monitor_module/news_monitor/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && python Web/app.py"
+    command: sh -c "pip install --no-cache-dir -r Web/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && python Web/app.py"
              
+    restart: always
+
+  news_monitor:
+    image: python:3.11-slim
+    container_name: sjtx_news_monitor
+
+    volumes:
+      - .:/app
+
+    working_dir: /app
+
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+      - NEWS_MONITOR_MAX_RSS_MB=1100
+      - NEWS_MONITOR_CHECK_INTERVAL=15
+      - NEWS_MONITOR_RESTART_DELAY=10
+      - NEWS_MONITOR_MAX_UPTIME_SECONDS=21600
+
+    network_mode: "host"
+
+    command: sh -c "pip install --no-cache-dir -r monitor_module/news_monitor/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && python monitor_module/news_monitor/daemon.py"
+
     restart: always
 
   nginx:

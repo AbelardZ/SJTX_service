@@ -38,7 +38,7 @@ _news_monitor_process = None
 def start_news_monitor_process():
     global _news_monitor_process
 
-    if os.environ.get('NEWS_MONITOR_AUTOSTART', '1') != '1':
+    if os.environ.get('NEWS_MONITOR_AUTOSTART', '0') != '1':
         print('[NEWS_MONITOR] Autostart disabled by NEWS_MONITOR_AUTOSTART')
         return None
 
@@ -94,10 +94,10 @@ except Exception as e: print(f"Failed to load reports_bp: {e}")
 _MODULES = [
     ('aiagent_module', 'aiagent_bp'),
     ('monitor_module', 'monitor_bp'),
-    ('monitor_module', 'monitor_history_bp'),
     ('industry_module', 'industry_bp'),
     ('limitup_module', 'limitup_bp'),
     ('industryrotation_module', 'industryrotation_bp'),
+    ('fund_monitor_module', 'fund_bp'),
 ]
 
 for module_dir, bp_attr in _MODULES:
