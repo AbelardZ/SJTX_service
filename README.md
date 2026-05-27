@@ -23,11 +23,11 @@
 - **功能**: 实现个股的深度研究报告自动化生成。
 - **逻辑**: 通过分布式爬虫获取巨潮资讯公告与研报等源数据，利用 RAG (检索增强生成) 架构，将相关公告或研报段落喂给 LLM 进行逻辑梳理，最终输出结构化的深度调研报告（涵盖商业基本面、大/小级别技术分析、资金面、投资建议等维度）。
 
-### 2. 多源舆情监控系统 (`news_monitor/`)
+### 2. 多源舆情监控系统 (`monitor_module/news_monitor/`)
 - **功能**: 全天候监控财联社等平台的实时快讯（电报）。
-- **逻辑**: 采用异步 Fetcher 模式抓取多渠道新闻流，通过预训练的 BERT 模型 (`classifier_core/`) 对新闻进行多标签业务分类，并实时推送至前端展示。
+- **逻辑**: 采用异步 Fetcher 模式抓取多渠道新闻流，通过预训练的 BERT 模型 (`classifier_core/`) 对新闻进行多标签业务分类，并实时写入 SQLite 缓存，供前端和报告层读取。
 
-### 3. AI 新闻简报 (`news_monitor/newsagent/`)
+### 3. AI 新闻简报 (`monitor_module/news_monitor/newsagent/`)
 - **功能**: 定时自动生成 A 股投资研究简报。
 - **逻辑**: 按早盘、午间、收盘及隔夜等固定时段，自动筛选新闻流并调用 DeepSeek 等大模型生成结构化 Markdown 报告。
 
@@ -37,7 +37,7 @@
 
 ### 5. 实时快讯看板 (`monitor_module/`)
 - **功能**: A 股实时快讯直播展示，支持分类标签过滤与历史回顾。
-- **逻辑**: 通过 SSE / 轮询从 SQLite 数据库读取 `news_monitor` 生产的分类快讯数据，提供前端实时展示。
+- **逻辑**: 通过 SSE / 轮询从 SQLite 数据库读取 `monitor_module/news_monitor` 生产的分类快讯数据，提供前端实时展示。
 
 ### 6. 涨停分析 (`limitup_module/`)
 - **功能**: A 股涨停板数据多维度分析与可视化。
@@ -68,31 +68,34 @@ SJTX_service/
 │       ├── data/                  # 个股向量库数据
 │       ├── reports/               # 生成的研究报告
 │       └── intro/                 # RAG 与部署说明文档
-├── news_monitor/                  # 舆情监控核心
-│   ├── main.py                    # 系统入口，启动抓取/分类/同步
-│   ├── config.py                  # 数据库与 API 配置
-│   ├── fetcher.py                 # 财联社等平台数据抓取
-│   ├── storage.py                 # 数据持久化
-│   ├── sync_worker.py             # 云端同步
-│   ├── db_proxy.py                # 数据库代理
-│   ├── classifier_core/           # BERT 分类器引擎
-│   │   ├── app.py                 # 分类服务入口
-│   │   ├── classifier.py          # 模型加载与预测
-│   │   └── ...                    # 预处理/存储/配置等子模块
-│   ├── newsagent/                 # AI 新闻简报
-│   │   ├── agent_worker.py        # 定时报告生成逻辑
-│   │   ├── llm.py                 # LLM API 封装
-│   │   └── docs/                  # 架构说明与运行约定
-│   └── data/
-│       └── newsagent_reports/     # 生成的简报存档
-│   └── bert_model_output/         # 预训练 BERT 模型权重
+├── monitor_module/                # 实时快讯展示模块
+│   ├── routes.py                  # Flask 蓝图，快讯 SSE/轮询接口
+│   ├── templates/                 # 快讯与历史页面模板
+│   └── news_monitor/              # 舆情监控核心
+│       ├── main.py                # 抓取/分类/入库主循环
+│       ├── daemon.py              # 系统级守护进程，监控 RSS 并自动重启
+│       ├── config.py              # 数据库与 API 配置
+│       ├── fetcher.py             # 财联社等平台数据抓取
+│       ├── storage.py             # 数据持久化
+│       ├── sync_worker.py         # 云端同步
+│       ├── db_proxy.py            # 数据库代理
+│       ├── paths.py               # SQLite 与报告路径定义
+│       ├── utils.py                # 去重、交易日、表名等通用工具
+│       ├── classifier_core/       # BERT 分类器引擎
+│       │   ├── app.py             # 分类服务入口
+│       │   ├── classifier.py      # 模型加载与预测
+│       │   └── ...                # 预处理/存储/配置等子模块
+│       ├── newsagent/             # AI 新闻简报
+│       │   ├── agent_worker.py    # 定时报告生成逻辑
+│       │   ├── llm.py             # LLM API 封装
+│       │   └── docs/              # 架构说明与运行约定
+│       ├── data/
+│       │   └── newsagent_reports/ # 生成的简报存档
+│       └── bert_model_output/     # 预训练 BERT 模型权重
 ├── industry_module/               # 行业研究模块
 │   ├── routes.py                  # Flask 蓝图，行业文档浏览
 │   ├── sw_industry_code_map.csv   # 申万行业编码映射
 │   └── industry/                  # 按行业分类的 Markdown 研报
-├── monitor_module/                # 实时快讯展示模块
-│   ├── routes.py                  # Flask 蓝图，快讯 SSE/轮询接口
-│   └── templates/                 # 快讯与历史页面模板
 ├── limitup_module/                # 涨停分析模块
 │   ├── routes.py                  # Flask 蓝图，涨停数据 API
 │   ├── server.py                  # 原独立 HTTP 服务器（已整合到蓝图）
@@ -103,6 +106,17 @@ SJTX_service/
 ├── nginx.conf                     # Nginx 反向代理配置 (SSE 优化)
 └── docker-compose.yml             # Docker 容器化编排 (Host 网络模式)
 ```
+
+### 架构完整性检查
+
+当前 README 的架构说明已经覆盖了主站、实时快讯、新闻抓取、AI 简报、行业研究和涨停分析这几条主线。新增的运行约束如下：
+
+- `Web/app.py` 只负责主站和蓝图注册，不再承担新闻流长期运行负载。
+- `docker-compose.yml` 同时拉起 `sjtx_core`、`sjtx_news_monitor` 和 `nginx`。
+- `monitor_module/news_monitor/daemon.py` 负责监控新闻流子进程的 RSS 和运行时长，避免长期内存增长拖垮整机。
+- `monitor_module/news_monitor/docs/architecture.md` 是新闻流内部的更细粒度架构说明，和 README 的总览分工明确。
+
+如果后续再增加新的后台任务，建议继续放在 `monitor_module/news_monitor/` 或独立模块下，并在 README 目录树里同步补齐入口、守护方式和数据落点。
 
 ---
 
@@ -130,13 +144,13 @@ SJTX_service/
 
 3. **配置文件准备**
    由于安全原因，敏感配置文件（如数据库密码、API Key）不包含在项目中。请根据各模块模板手动创建以下文件：
-   - `news_monitor/config.py`
+   - `monitor_module/news_monitor/config.py`
 
 4. **一键启动**
    ```bash
    sudo docker-compose up -d --build
    ```
-   该命令将启动 Nginx 反向代理、Web 服务及 `news_monitor` 后台数据处理容器。系统采用 Host 网络模式，方便配合 Tailscale 等内网穿透工具使用。
+   该命令将启动 Nginx 反向代理、Web 服务和独立的 `news_monitor` 守护容器。新闻流现在单独运行，带有 RSS 监控和自动重启，避免和主站共用一个进程内存。
 
 ---
 
@@ -225,4 +239,33 @@ docker-compose up -d --build
 
 ---
 
-*Last Updated: 2026-05-25*
+---
+
+## 📝 更新日志
+
+### 2026-05-27
+
+**新闻监控模块 (monitor_module) 重要修复与优化：**
+
+1. **时段数据隔离修复**
+   - 修复：选择具体时段（morning/noon/afternoon/overnight）但未选日期时，只查询最新一天的数据，不再混杂多天数据
+   - 修复：选择历史日期查看时，不再被当前时间截断消息，完整展示该日期全部数据
+
+2. **AI 研报生成重构**
+   - overnight 时段归属修正：overnight（前一天 15:00 ~ 当天 09:30）的 report_date 归为当天
+   - 一天正确顺序：overnight → morning → noon → afternoon
+   - 研报生成改为独立子进程执行，LLM 调用崩溃不再影响主新闻抓取进程
+   - 新增 `.doing` 锁文件防止并发重复执行
+   - 新增 `.done` 标记文件实现崩溃恢复：进程崩溃重启后自动补跑未完成的研报，不遗漏不重复
+
+3. **前端体验优化**
+   - 进入新闻监控页面自动加载当天全部时段、全部筛选的消息
+   - `loadRealtimeData()` 现在正确传递 `period` 参数给后端
+
+**后端路由优化 (routes.py)：**
+- `telegraph_init`：指定时段但未选日期时只查最新一天（`days=1`）
+- `telegraph_init`：仅在实时模式（未指定日期）下按当前时段截断消息
+
+---
+
+*Last Updated: 2026-05-27*

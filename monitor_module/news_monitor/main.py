@@ -7,9 +7,15 @@ import threading
 import os
 import sys
 import sqlite3
-import pymysql
 import traceback
 from collections import deque
+from pathlib import Path
+import gc
+
+try:
+    import ctypes
+except Exception:
+    ctypes = None
 
 # Ensure project root and classifier modules path are available
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,7 +44,6 @@ except ImportError:
     def get_segment(dt): return "Morning"
     def get_table_name(dt): return f"telegraph_{dt.strftime('%Y%m%d')}"
 
-HOME_PC_IP = "100.75.180.70"
 DB_PATH = os.path.join(current_dir, "news_buffer.db")
 TABLE_DATE_RE = re.compile(r"^telegraph_(\d{4})_(\d{2})_(\d{2})(?:_.*)?$")
 TABLE_DATE_RE_COMPACT = re.compile(r"^telegraph_(\d{8})(?:_.*)?$")
@@ -63,7 +68,25 @@ def get_classifier():
 
 seen_ids = set()
 seen_id_queue = deque()
-MAX_SEEN_IDS = 300000
+MAX_SEEN_IDS = 50000
+
+
+def _trim_memory():
+    """尽量把 Python 和 libc 层已经释放的内存还给系统。"""
+    try:
+        gc.collect()
+    except Exception:
+        pass
+
+    if ctypes is None or os.name != "posix":
+        return
+
+    try:
+        libc = ctypes.CDLL("libc.so.6")
+        if hasattr(libc, "malloc_trim"):
+            libc.malloc_trim(0)
+    except Exception:
+        pass
 
 
 def remember_seen_id(item_id):
@@ -175,125 +198,11 @@ def cleanup_sqlite_retention(conn, keep_days=5):
     conn.commit()
     return drop_tables
 
-def sync_worker():
-    """Background worker to sync from local SQLite to remote MySQL"""
-    print("[SYNC] Worker started.")
-    while True:
-        try:
-            conn_sqlite = get_sqlite_conn()
-            cursor_sqlite = conn_sqlite.cursor()
-            
-            # Identify tables
-            cursor_sqlite.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'telegraph_%'")
-            tables = [r[0] for r in cursor_sqlite.fetchall()]
-            
-            if not tables:
-                conn_sqlite.close()
-                time.sleep(10)
-                continue
-
-            # Connect to MySQL
-            conn_mysql = None
-            try:
-                conn_mysql = pymysql.connect(
-                    host=HOME_PC_IP,
-                    user='inv_zhy',
-                    password='zhy20050112',
-                    database='NewsDB',
-                    charset='utf8mb4',
-                    connect_timeout=3
-                )
-            except Exception:
-                # Remote not available
-                conn_sqlite.close()
-                time.sleep(30)
-                continue
-                
-            remote_cursor = conn_mysql.cursor()
-            synced_count = 0
-            
-            for table in tables:
-                try:
-                    # Get unsynced
-                    cursor_sqlite.execute(f"SELECT * FROM `{table}` WHERE is_synced=0 LIMIT 50")
-                    rows = cursor_sqlite.fetchall()
-                    if not rows: continue
-                    
-                    # Columns
-                    col_names = list(rows[0].keys())
-                    
-                    for row in rows:
-                        row_dict = dict(row)
-                        
-                        # Prepare MySQL create table
-                        create_sql = f"""CREATE TABLE IF NOT EXISTS `{table}` (
-                            id BIGINT PRIMARY KEY,
-                            title TEXT,
-                            content TEXT,
-                            brief TEXT,
-                            ctime DATETIME,
-                            trading_date DATE,
-                            is_trading_day TINYINT(1),
-                            segment VARCHAR(20),
-                            primary_label VARCHAR(64),
-                            labels_json TEXT,
-                            scores_json TEXT,
-                            is_synced TINYINT(1) DEFAULT 1
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"""
-                        remote_cursor.execute(create_sql)
-                        
-                        # Prepare insert
-                        target_cols = ['id', 'title', 'content', 'brief', 'ctime', 'trading_date', 
-                                     'is_trading_day', 'segment', 'primary_label', 'labels_json', 'scores_json']
-                        
-                        vals = []
-                        valid_row = True
-                        for c in target_cols:
-                            v = row_dict.get(c)
-                            if c == 'is_trading_day': 
-                                v = int(v) if v is not None else 0
-                            elif c == 'brief' and v is None:
-                                v = ''
-                            vals.append(v)
-                            
-                        placeholders = ','.join(['%s'] * len(target_cols))
-                        # Use INSERT IGNORE to avoid key errors if sync retries
-                        insert_sql = f"INSERT IGNORE INTO `{table}` ({','.join(target_cols)}, is_synced) VALUES ({placeholders}, 1)"
-                        
-                        try:
-                            # If row exists, we update nothing or update title? Let's just ignore
-                            remote_cursor.execute(insert_sql, vals)
-                            
-                            # Mark synced in SQLite
-                            cursor_sqlite.execute(f"UPDATE `{table}` SET is_synced=1 WHERE id=?", (row_dict['id'],))
-                            synced_count += 1
-                        except Exception as e:
-                            print(f"[SYNC INSERT ERROR] {e}")
-                            
-                    conn_mysql.commit()
-                    conn_sqlite.commit()
-                    
-                except Exception as e:
-                    print(f"[SYNC TABLE ERROR] {table}: {e}")
-                    
-            conn_sqlite.close()
-            conn_mysql.close()
-            
-            if synced_count > 0:
-                print(f"[SYNC] Synced {synced_count} items.")
-                
-        except Exception as e:
-            print(f"[SYNC WORKER ERROR] {e}")
-            
-        time.sleep(5)
-
 def main():
-    print("[SYSTEM] Starting News Monitor (Fetch->Classify->SQLite->Sync)...")
+    print("[SYSTEM] Starting News Monitor (Fetch->Classify->SQLite)...")
     
-    # Start sync thread
-    t = threading.Thread(target=sync_worker, daemon=True)
-    t.start()
     last_cleanup_at = 0
+    last_trim_at = 0
     
     while True:
         try:
@@ -373,86 +282,110 @@ def main():
                 if saved_count > 0:
                     print(f"[STORE] Saved {saved_count} new items to SQLite.")
 
-            # 4. Retention cleanup: 自动只保留最近5天
-            now_ts = time.time()
-            if now_ts - last_cleanup_at > 1800:
-                try:
-                    conn = get_sqlite_conn()
-                    dropped = cleanup_sqlite_retention(conn, keep_days=5)
-                    conn.close()
-                    if dropped:
-                        print(f"[CLEANUP] Dropped old tables: {len(dropped)}")
-                except Exception as ce:
-                    print(f"[CLEANUP ERROR] {ce}")
-                last_cleanup_at = now_ts
+            if now_ts - last_trim_at > 300:
+                _trim_memory()
+                last_trim_at = now_ts
             
             time.sleep(random.randint(20, 40))
             
         except Exception as e:
             traceback.print_exc()
+            _trim_memory()
             time.sleep(10)
 
 if __name__ == "__main__":
     # Start NewsAgent worker thread
     try:
-        from monitor_module.news_monitor.newsagent.agent_worker import run_job
-        def agent_monitor_loop():
-            # Initial Run
+        import subprocess as _subprocess
+        from monitor_module.news_monitor.newsagent.agent_worker import REPORTS_DIR
+
+        # 用文件标记已完成的 job，崩溃重启后不会遗漏也不会重复
+        def _job_done_marker_path(report_date, period_name):
+            return Path(REPORTS_DIR) / report_date.isoformat() / period_name / ".done"
+
+        def _job_doing_marker_path(report_date, period_name):
+            return Path(REPORTS_DIR) / report_date.isoformat() / period_name / ".doing"
+
+        def _is_job_done(report_date, period_name):
+            return _job_done_marker_path(report_date, period_name).exists()
+
+        def _is_job_doing(report_date, period_name):
+            return _job_doing_marker_path(report_date, period_name).exists()
+
+        def _mark_job_done(report_date, period_name):
+            p = _job_done_marker_path(report_date, period_name)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(datetime.datetime.now().isoformat())
+            # 清理 .doing 锁
+            dp = _job_doing_marker_path(report_date, period_name)
+            if dp.exists():
+                dp.unlink()
+
+        def _run_job_in_subprocess(period, report_date):
+            """在独立子进程中执行 run_job，避免 LLM 调用 OOM 拖垮主进程。"""
+            # 写入 .doing 锁，防止并发
+            dp = _job_doing_marker_path(report_date, period)
+            dp.parent.mkdir(parents=True, exist_ok=True)
+            dp.write_text(str(os.getpid()))
+
+            script = str(Path(__file__).resolve().parent / "newsagent" / "agent_worker.py")
+            cmd = [
+                sys.executable, script,
+                "--period", period,
+                "--date", report_date.isoformat(),
+            ]
+            print(f"[AIAGENT] Launching subprocess: {' '.join(cmd)}")
             try:
-                print("[AIAGENT] Initializing NewsAI Agent...")
-                run_job() # Initial run for current/last period
-            except Exception as ae:
-                print(f"[AIAGENT INIT ERROR] {ae}")
+                proc = _subprocess.Popen(cmd, cwd=str(project_root))
+                ret = proc.wait()
+                if ret != 0:
+                    raise RuntimeError(f"Subprocess exited with code {ret}")
+            finally:
+                # 无论成功失败都清理 .doing 锁
+                if dp.exists():
+                    dp.unlink()
+            print(f"[AIAGENT] Subprocess done: {period} (date={report_date})")
 
-            # 记录当日每个触发点是否已执行，避免跨天被错误去重
-            triggered_keys = set()
-
-            # 触发点: 在报告期结束时触发对应报告
+        def agent_monitor_loop():
+            # 触发点: 时段结束后 60 秒触发，确保该时段数据已完整入库
+            # (触发时间, 对应时段, 数据所属日期偏移)
             trigger_points = [
-                ("09:30", "overnight"),
-                ("11:30", "morning"),
-                ("13:00", "noon"),
-                ("15:00", "afternoon"),
+                ("09:31", "overnight", 0),    # overnight 属于当天 00:00-09:30
+                ("11:31", "morning", 0),
+                ("13:01", "noon", 0),
+                ("15:01", "afternoon", 0),
             ]
 
-            print("[AIAGENT] NewsAI Agent monitor thread started.")
+            print("[AIAGENT] NewsAI Agent monitor thread started (post-period trigger mode, subprocess).")
             while True:
                 now = datetime.datetime.now()
 
-                # 清理两天前的 key，防止集合无限增长
-                if len(triggered_keys) > 40:
-                    today = now.date()
-                    keep = set()
-                    for key in triggered_keys:
-                        try:
-                            d = datetime.datetime.strptime(key.split("|")[0], "%Y-%m-%d").date()
-                            if (today - d).days <= 1:
-                                keep.add(key)
-                        except Exception:
-                            pass
-                    triggered_keys = keep
-
-                for hhmm, period in trigger_points:
+                for hhmm, period, date_offset in trigger_points:
                     h, m = map(int, hhmm.split(":"))
                     target = now.replace(hour=h, minute=m, second=0, microsecond=0)
                     delta = (now - target).total_seconds()
 
-                    # 在触发点后的 0~89 秒内执行一次，避免线程漂移错过
-                    if 0 <= delta < 90:
-                        key = f"{now.date().isoformat()}|{period}|{hhmm}"
-                        if key not in triggered_keys:
-                            try:
-                                print(f"[AIAGENT] Triggering job for {period} at {hhmm}")
-                                run_job(period)
-                            except Exception as ae:
-                                print(f"[AIAGENT ERROR] {ae}")
-                            triggered_keys.add(key)
+                    report_date = (now + datetime.timedelta(days=date_offset)).date()
 
-                time.sleep(10)
+                    # 触发点已过 且 未完成 且 未在执行中 → 执行（含崩溃后补跑）
+                    if delta >= 0 and not _is_job_done(report_date, period) and not _is_job_doing(report_date, period):
+                        try:
+                            print(f"[AIAGENT] Triggering job for {period} (date={report_date}) at {now.strftime('%H:%M:%S')}")
+                            _run_job_in_subprocess(period, report_date)
+                            _mark_job_done(report_date, period)
+                            print(f"[AIAGENT] Job marked done: {period} (date={report_date})")
+                        except Exception as ae:
+                            print(f"[AIAGENT ERROR] {ae}")
+                            import traceback
+                            traceback.print_exc()
+
+                time.sleep(15)
         
         agent_thread = threading.Thread(target=agent_monitor_loop, daemon=True)
         agent_thread.start()
     except Exception as e:
         print(f"[AIAGENT SETUP ERROR] {e}")
+        import traceback
+        traceback.print_exc()
 
     main()

@@ -11,6 +11,14 @@ import re
 from pathlib import Path
 
 from monitor_module.news_monitor.paths import REPORTS_DIR
+from monitor_module.news_monitor.newsagent.topics import (
+    FRONTEND_LABEL_GROUPS,
+    FRONTEND_LABEL_OPTIONS,
+    LABEL_STYLE_CLASS_MAP,
+    classify_news_cluster,
+    latest_report_file,
+    report_file_glob,
+)
 
 # ============================================================
 # monitor_bp — 实时电报直播 (SQLite)
@@ -24,15 +32,8 @@ _MODULE_DIR = Path(__file__).resolve().parent
 BASE_DIR = _MODULE_DIR.parent
 SQLITE_DB_PATH = str(_MODULE_DIR / 'news_monitor' / 'news_buffer.db')
 
-LABEL_GROUPS = [
-    {'name': '市场金融', 'tags': ['交易提示', '公司公告', '机构观点和策略', '金融部门事务']},
-    {'name': '行业科技', 'tags': ['行业消息', '行业数据', '重要主体动态', '科学技术前沿动态']},
-    {'name': '国内政策', 'tags': ['国内政治动态', '国内一般指导', '国内一般政策', '国内政府动向']},
-    {'name': '国际事务', 'tags': ['一般国际事务', '国际一般政策', '国际金融政策', '重要国家内政', '地缘政治动态']},
-    {'name': '宏观数据', 'tags': ['国内宏观数据', '国际宏观数据']},
-    {'name': '其它事件', 'tags': ['自然事件', '社会事件', '新闻集合', '其它']}
-]
-LABEL_OPTIONS = ['全部'] + [tag for group in LABEL_GROUPS for tag in group['tags']]
+LABEL_GROUPS = FRONTEND_LABEL_GROUPS
+LABEL_OPTIONS = FRONTEND_LABEL_OPTIONS
 
 _latest_cache = []
 _last_seen_ids = set()
@@ -81,13 +82,18 @@ def _row_to_message(item):
     except Exception:
         labels = []
 
+    source_label = item.get('primary_label') or ''
+    cluster_label = classify_news_cluster(source_label)
+
     return {
         'id': item.get('id'),
         'title': item.get('title') or '',
         'content': item.get('content') or '',
         'ctime': _to_unix_ts(item.get('ctime')),
         'labels': labels,
-        'primary_label': item.get('primary_label') or '其它',
+        'primary_label': source_label,
+        'cluster_label': cluster_label,
+        'cluster_class': LABEL_STYLE_CLASS_MAP.get(source_label, 'cluster-digest'),
         'segment': item.get('segment') or ''
     }
 
@@ -138,7 +144,7 @@ def _list_available_dates(cursor, limit=30):
     return dates
 
 
-def _load_messages_from_tables(cursor, tables, period='all', limit=5000):
+def _load_messages_from_tables(cursor, tables, period='all', label_filter='全部', limit=5000):
     messages = []
     seen_ids = set()
     for table_name in tables:
@@ -156,8 +162,15 @@ def _load_messages_from_tables(cursor, tables, period='all', limit=5000):
                 row_id = d.get('id')
                 if row_id in seen_ids:
                     continue
+                msg = _row_to_message(d)
+                if label_filter and label_filter != '全部':
+                    if isinstance(label_filter, list):
+                        if msg.get('primary_label') not in label_filter and msg.get('cluster_label') not in label_filter:
+                            continue
+                    elif msg.get('primary_label') != label_filter and msg.get('cluster_label') != label_filter:
+                        continue
                 seen_ids.add(row_id)
-                messages.append(_row_to_message(d))
+                messages.append(msg)
         except Exception as e:
             print(f"Table read failed: {table_name}, {e}")
             continue
@@ -249,6 +262,28 @@ def _normalize_label(label=None):
     if label in LABEL_OPTIONS: return label
     return '全部'
 
+
+def _resolve_report_path(date_str: str = '', period: str = '', cluster: str = '综合'):
+    cluster = cluster or '综合'
+    if date_str:
+        date_dir = Path(REPORTS_DIR) / date_str
+        if period and period != 'all':
+            exact = date_dir / period / f'{cluster}.md'
+            if exact.exists():
+                return exact
+            candidates = report_file_glob(Path(REPORTS_DIR), date_str, period, cluster)
+            return candidates[0] if candidates else None
+
+        candidates = report_file_glob(Path(REPORTS_DIR), date_str, None, cluster)
+        return candidates[0] if candidates else None
+
+    if period and period != 'all':
+        latest = latest_report_file(Path(REPORTS_DIR), period, cluster)
+        return latest
+
+    latest = latest_report_file(Path(REPORTS_DIR), None, cluster)
+    return latest
+
 @monitor_bp.route('/')
 def index():
     return render_template('monitor_index.html')
@@ -267,6 +302,7 @@ def telegraph_init():
     date_str = request.args.get('date', '').strip()
     days = request.args.get('days', '3')
     period = request.args.get('period', 'all')
+    search = request.args.get('search', '').strip()
     try:
         days = max(1, min(int(days), 7))
     except Exception:
@@ -280,16 +316,27 @@ def telegraph_init():
         cursor = conn.cursor()
         if date_str:
             target_tables = _list_tables_for_date(cursor, date_str)
+        elif period and period != 'all':
+            # 指定了具体时段但未选日期：只查最新一天，避免跨天混杂
+            target_tables = _list_recent_tables(cursor, days=1)
         else:
             target_tables = _list_recent_tables(cursor, days=days)
         if not target_tables:
             return jsonify([])
 
-        messages = _load_messages_from_tables(cursor, target_tables, period=period, limit=5000)
+        messages = _load_messages_from_tables(cursor, target_tables, period=period, label_filter=request.args.get('label', '全部'), limit=5000)
 
-        if period == 'all':
+        if period == 'all' and not date_str:
+            # 仅在实时模式（未指定日期）下，按当前时段截断消息
             end_ts = _period_end_ts()
             messages = [m for m in messages if m.get('ctime', 0) <= end_ts]
+
+        # 关键字搜索过滤
+        if search:
+            kw = search.lower()
+            messages = [m for m in messages if
+                        kw in (m.get('title') or '').lower() or
+                        kw in (m.get('content') or '').lower()]
 
         with _lock:
             global _latest_cache
@@ -317,44 +364,50 @@ def telegraph_dates():
         conn.close()
 
 
+@monitor_bp.route('/telegraph/latest_date')
+def telegraph_latest_date():
+    """返回数据库中最新有数据的日期"""
+    conn = _get_sqlite_conn()
+    if not conn:
+        return jsonify({'date': ''})
+    try:
+        cursor = conn.cursor()
+        dates = _list_available_dates(cursor, limit=1)
+        return jsonify({'date': dates[0] if dates else ''})
+    except Exception:
+        return jsonify({'date': ''})
+    finally:
+        conn.close()
+
+
 @monitor_bp.route('/telegraph/report')
 def telegraph_report():
     date_str = request.args.get('date', '').strip()
     period = request.args.get('period', '').strip().lower()
-    if period not in ('morning', 'noon', 'afternoon', 'overnight', ''):
+    cluster = request.args.get('cluster', '综合').strip() or '综合'
+    if period not in ('morning', 'noon', 'afternoon', 'overnight', 'all', ''):
         return jsonify({'ok': False, 'msg': 'invalid period'})
 
     reports_dir = str(REPORTS_DIR)
     if not os.path.isdir(reports_dir):
         return jsonify({'ok': False, 'msg': 'report dir not found'})
 
-    if date_str:
-        compact = date_str.replace('-', '')
-    else:
-        compact = ''
+    if period == 'all':
+        period = ''
 
-    if period and compact:
-        pattern = f'report_{compact}_{period}.md'
-        files = sorted(glob.glob(os.path.join(reports_dir, pattern)), key=os.path.getmtime, reverse=True)
-    elif period:
-        files = sorted(glob.glob(os.path.join(reports_dir, f'report_*_{period}.md')), key=os.path.getmtime, reverse=True)
-    elif compact:
-        files = sorted(glob.glob(os.path.join(reports_dir, f'report_{compact}_*.md')), key=os.path.getmtime, reverse=True)
-    else:
-        files = sorted(glob.glob(os.path.join(reports_dir, 'report_*.md')), key=os.path.getmtime, reverse=True)
-
-    if not files:
+    latest = _resolve_report_path(date_str, period, cluster)
+    if not latest or not latest.exists():
         return jsonify({'ok': False, 'msg': 'No report found'})
 
-    latest = files[0]
     try:
         with open(latest, 'r', encoding='utf-8') as f:
             content = f.read().strip()
     except Exception as e:
         return jsonify({'ok': False, 'msg': f'read report failed: {e}'})
 
-    detected_period = os.path.basename(latest).split('_')[-1].replace('.md', '')
-    return jsonify({'ok': True, 'report': content, 'period': detected_period})
+    detected_period = latest.parent.name
+    detected_cluster = latest.stem
+    return jsonify({'ok': True, 'report': content, 'period': detected_period, 'cluster': detected_cluster})
 
 @monitor_bp.route('/telegraph/stream')
 def telegraph_stream():
@@ -369,242 +422,3 @@ def telegraph_stream():
             except GeneratorExit:
                 break
     return Response(stream(), mimetype='text/event-stream')
-
-
-# ============================================================
-# monitor_history_bp — 历史消息库 (MySQL + SQLite fallback)
-# ============================================================
-monitor_history_bp = Blueprint('monitor_history', __name__, url_prefix='/monitor', template_folder='templates')
-
-HOME_PC_IP = '100.75.180.70'
-_HOME_DB_CFG = {
-    'host': HOME_PC_IP,
-    'user': 'inv_zhy',
-    'password': 'zhy20050112',
-    'database': 'NewsDB',
-    'charset': 'utf8mb4',
-    'connect_timeout': 3
-}
-
-def _get_conn():
-    try:
-        import pymysql
-        return pymysql.connect(**_HOME_DB_CFG)
-    except:
-        return None
-
-def _normalize_label_hist(label):
-    if not label or label == 'all':
-        return '全部'
-    if label in LABEL_OPTIONS:
-        return label
-    return '全部'
-
-def _get_sqlite_conn_hist():
-    if not os.path.exists(SQLITE_DB_PATH):
-        return None
-    conn = sqlite3.connect(SQLITE_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def _get_history_backend_conn():
-    conn = _get_conn()
-    if conn:
-        return 'mysql', conn
-
-    conn = _get_sqlite_conn_hist()
-    if conn:
-        return 'sqlite', conn
-
-    return None, None
-
-def _extract_table_date(table_name):
-    match = re.match(r"^telegraph_(\d{4}_\d{2}_\d{2})(?:_.*)?$", table_name or "")
-    if not match:
-        return None
-    return match.group(1).replace('_', '-')
-
-
-def _date_range(start_date, end_date):
-    current = start_date
-    while current <= end_date:
-        yield current
-        current += datetime.timedelta(days=1)
-
-def _list_tables_for_date_hist(conn, backend, target_date):
-    date_key = target_date.strftime('%Y_%m_%d')
-    cursor = conn.cursor()
-    if backend == 'mysql':
-        cursor.execute("SHOW TABLES LIKE %s", (f"telegraph_{date_key}%",))
-    else:
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE ?", (f"telegraph_{date_key}%",))
-    rows = cursor.fetchall()
-    return [r[0] for r in rows]
-
-
-def _fetch_rows_from_table(conn, backend, table_name, label_filter, limit):
-    cursor = conn.cursor()
-
-    if backend == 'mysql':
-        placeholder = '%s'
-    else:
-        placeholder = '?'
-
-    cursor.execute(f"PRAGMA table_info(`{table_name}`)" if backend == 'sqlite' else f"SHOW COLUMNS FROM `{table_name}`")
-    if backend == 'sqlite':
-        columns = {col[1] for col in cursor.fetchall()}
-        has_primary_label = 'primary_label' in columns
-    else:
-        columns = {col[0] for col in cursor.fetchall()}
-        has_primary_label = 'primary_label' in columns
-
-    rows = []
-    if has_primary_label:
-        if label_filter == '全部':
-            sql = f"SELECT id, title, content, ctime, primary_label FROM `{table_name}` ORDER BY id DESC LIMIT {placeholder}"
-            cursor.execute(sql, (limit,))
-        else:
-            sql = f"SELECT id, title, content, ctime, primary_label FROM `{table_name}` WHERE primary_label={placeholder} ORDER BY id DESC LIMIT {placeholder}"
-            cursor.execute(sql, (label_filter, limit))
-
-        cols = [d[0] for d in cursor.description]
-        for raw in cursor.fetchall():
-            rows.append(dict(zip(cols, raw)))
-    else:
-        if label_filter not in ('全部', '其它'):
-            return []
-
-        sql = f"SELECT id, title, content, ctime FROM `{table_name}` ORDER BY id DESC LIMIT {placeholder}"
-        cursor.execute(sql, (limit,))
-        cols = [d[0] for d in cursor.description]
-        for raw in cursor.fetchall():
-            r = dict(zip(cols, raw))
-            r['primary_label'] = '其它'
-            rows.append(r)
-
-    return rows
-
-def _list_historical_rows(target_date, label_filter, limit):
-    backend, conn = _get_history_backend_conn()
-    if not conn:
-        return []
-
-    try:
-        tables = _list_tables_for_date_hist(conn, backend, target_date)
-        if not tables:
-            return []
-
-        rows = []
-        for table_name in tables:
-            rows.extend(_fetch_rows_from_table(conn, backend, table_name, label_filter, limit))
-
-        rows.sort(key=lambda item: _to_unix_ts(item.get('ctime')), reverse=True)
-        return rows[:limit]
-    except Exception:
-        return []
-    finally:
-        conn.close()
-
-
-def _list_historical_rows_in_range(start_date, end_date, label_filter, limit):
-    backend, conn = _get_history_backend_conn()
-    if not conn:
-        return []
-
-    try:
-        rows = []
-        for target_date in _date_range(start_date, end_date):
-            tables = _list_tables_for_date_hist(conn, backend, target_date)
-            for table_name in tables:
-                rows.extend(_fetch_rows_from_table(conn, backend, table_name, label_filter, limit))
-
-        rows.sort(key=lambda item: _to_unix_ts(item.get('ctime')), reverse=True)
-        return rows[:limit]
-    finally:
-        conn.close()
-
-@monitor_history_bp.route('/history')
-def history():
-    initial = _normalize_label_hist(request.args.get('label'))
-    selected_date = request.args.get('date')
-    if not selected_date:
-        yesterday = datetime.date.today() - datetime.timedelta(days=1)
-        selected_date = yesterday.strftime('%Y-%m-%d')
-    return render_template('history.html', 
-                           label_groups=LABEL_GROUPS, 
-                           labels=LABEL_OPTIONS, 
-                           initial=initial, 
-                           selected_date=selected_date)
-
-@monitor_history_bp.route('/history/data')
-@monitor_history_bp.route('/api/history')
-def history_data():
-    date_str = request.args.get('date')
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
-    label_filter = _normalize_label_hist(request.args.get('label'))
-    limit = int(request.args.get('limit', 1000))
-    limit = max(1, min(limit, 5000))
-    
-    try:
-        if start_date_str and end_date_str:
-            start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            if start_date > end_date:
-                start_date, end_date = end_date, start_date
-            rows = _list_historical_rows_in_range(start_date, end_date, label_filter, limit)
-            date_label = f'{start_date.strftime("%Y-%m-%d")} ~ {end_date.strftime("%Y-%m-%d")}'
-        else:
-            if not date_str:
-                return jsonify({'error': '日期参数不能为空'}), 400
-            query_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-            rows = _list_historical_rows(query_date, label_filter, limit)
-            date_label = date_str
-    except ValueError:
-        return jsonify({'error': '日期格式错误'}), 400
-    items = []
-    for row in rows:
-        ts = _to_unix_ts(row.get('ctime'))
-        items.append({
-            'id': row.get('id'),
-            'title': row.get('title') or '',
-            'content': row.get('content') or '',
-            'primary_label': row.get('primary_label') or '其它',
-            'ctime': ts,
-            'time_str': datetime.datetime.fromtimestamp(ts).strftime('%m-%d %H:%M:%S')
-        })
-        
-    return jsonify({
-        'items': items,
-        'count': len(items),
-        'date': date_label,
-        'mode': 'range' if start_date_str and end_date_str else 'single'
-    })
-
-@monitor_history_bp.route('/history/dates')
-def available_dates():
-    backend, conn = _get_history_backend_conn()
-    if not conn:
-        return jsonify([])
-
-    try:
-        cursor = conn.cursor()
-        if backend == 'mysql':
-            cursor.execute("SHOW TABLES LIKE 'telegraph_%'")
-        else:
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'telegraph_%'")
-        table_rows = cursor.fetchall()
-        table_names = [r[0] for r in table_rows]
-
-        dates = set()
-        for table_name in table_names:
-            date_str = _extract_table_date(table_name)
-            if date_str:
-                dates.add(date_str)
-
-        return jsonify(sorted(dates, reverse=True))
-    except Exception:
-        return jsonify([])
-    finally:
-        conn.close()
