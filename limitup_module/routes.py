@@ -6,6 +6,7 @@
 
 import csv
 import re
+from collections import defaultdict
 from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, request, send_from_directory
@@ -21,6 +22,10 @@ limitup_bp = Blueprint(
 _MODULE_DIR = Path(__file__).resolve().parent
 DATA_DIR = _MODULE_DIR / "data"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# 缓存趋势聚合数据（进程级缓存，避免每次请求都遍历所有CSV）
+_trend_cache: dict | None = None
+_trend_cache_mtime: float = 0
 
 
 def _available_dates() -> list[str]:
@@ -50,6 +55,75 @@ def _read_csv_rows(trade_date: str) -> tuple[list[str], list[dict[str, str]]]:
     return columns, rows
 
 
+def _get_trend_data() -> dict:
+    """返回所有日期的聚合趋势数据（带缓存）。
+
+    返回格式:
+    {
+        "dates": ["2026-05-06", ...],
+        "total": [{"date": "2026-05-06", "value": 42}, ...],
+        "industry": {"电子": [{"date": "2026-05-06", "value": 5}, ...], ...},
+        "theme": {"芯片": [{"date": "2026-05-06", "value": 3}, ...], ...}
+    }
+    """
+    global _trend_cache, _trend_cache_mtime
+
+    # 检查缓存是否有效（通过 data 目录的修改时间判断）
+    try:
+        current_mtime = max(
+            (p.stat().st_mtime for p in DATA_DIR.glob("*.csv") if DATE_RE.match(p.stem)),
+            default=0,
+        )
+    except Exception:
+        current_mtime = 0
+
+    if _trend_cache is not None and _trend_cache_mtime >= current_mtime:
+        return _trend_cache
+
+    dates = _available_dates()
+    total_series: list[dict] = []
+    industry_map: dict[str, list[dict]] = defaultdict(list)
+    theme_map: dict[str, list[dict]] = defaultdict(list)
+
+    for date in dates:
+        try:
+            _, rows = _read_csv_rows(date)
+        except Exception:
+            continue
+
+        total_series.append({"date": date, "value": len(rows)})
+
+        # 统计申万一级
+        industry_counts: dict[str, int] = defaultdict(int)
+        for row in rows:
+            ind = (row.get("申万一级") or "").strip()
+            if ind:
+                industry_counts[ind] += 1
+        for ind, count in industry_counts.items():
+            industry_map[ind].append({"date": date, "value": count})
+
+        # 统计韭研题材
+        theme_counts: dict[str, int] = defaultdict(int)
+        for row in rows:
+            themes_raw = (row.get("韭研题材") or "").strip()
+            if themes_raw:
+                for t in re.split(r"[+、，,；;｜|/]", themes_raw):
+                    t = t.strip()
+                    if t:
+                        theme_counts[t] += 1
+        for theme, count in theme_counts.items():
+            theme_map[theme].append({"date": date, "value": count})
+
+    _trend_cache = {
+        "dates": dates,
+        "total": total_series,
+        "industry": dict(industry_map),
+        "theme": dict(theme_map),
+    }
+    _trend_cache_mtime = current_mtime
+    return _trend_cache
+
+
 # ── 页面路由 ──────────────────────────────────────────────
 
 
@@ -65,6 +139,16 @@ def index():
 @limitup_bp.route("/api/dates")
 def api_dates():
     return jsonify({"dates": _available_dates()})
+
+
+@limitup_bp.route("/api/trend")
+def api_trend():
+    """返回所有日期的聚合趋势数据（轻量级，仅统计数量）。
+
+    前端趋势图不再需要加载所有日期的完整CSV，
+    只需调用此接口获取每日涨停总数、行业分布、题材分布。
+    """
+    return jsonify(_get_trend_data())
 
 
 @limitup_bp.route("/api/data")

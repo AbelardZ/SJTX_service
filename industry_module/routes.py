@@ -1,8 +1,10 @@
+import csv
+import json
 from pathlib import Path
 
 import markdown
 
-from flask import Blueprint, Response, abort, render_template, render_template_string
+from flask import Blueprint, Response, abort, jsonify, render_template, render_template_string
 
 industry_bp = Blueprint('industry', __name__, url_prefix='/industry', template_folder='templates')
 
@@ -10,6 +12,8 @@ _MODULE_DIR = Path(__file__).resolve().parent
 BASE_DIR = _MODULE_DIR.parent
 INDUSTRY_CSV_PATH = BASE_DIR / 'industry_module' / 'sw_industry_code_map.csv'
 INDUSTRY_DOC_DIR = BASE_DIR / 'industry_module' / 'industry'
+STOCKDATA_DIR = BASE_DIR / 'industry_module' / 'stockdata'
+REPORTS_DIR = BASE_DIR / 'industry_module' / 'reports'
 
 
 def _resolve_industry_doc(doc_path: str) -> Path | None:
@@ -110,3 +114,105 @@ def doc_raw(doc_path):
 
     content = doc_file.read_text(encoding='utf-8')
     return Response(content, mimetype='text/markdown; charset=utf-8')
+
+
+def _find_latest_stockdata_csv() -> tuple[Path | None, str]:
+    """Return (path, date_str) of the newest CSV in stockdata/ by filename date."""
+    if not STOCKDATA_DIR.exists():
+        return None, ''
+
+    csv_files = sorted(STOCKDATA_DIR.glob('*.csv'))
+    if not csv_files:
+        return None, ''
+
+    # Pick the file with the latest mtime as tiebreaker; prefer filename date order
+    latest = max(csv_files, key=lambda p: (p.stem, p.stat().st_mtime))
+    date_str = latest.stem  # e.g. "2026-05-29"
+    return latest, date_str
+
+
+@industry_bp.route('/stockdata/latest')
+def stockdata_latest():
+    """Return the latest stock data as a JSON map keyed by stock code."""
+    csv_path, date_str = _find_latest_stockdata_csv()
+    if not csv_path:
+        return jsonify({'date': '', 'data': {}, 'error': 'No stock data CSV found'})
+
+    data_map = {}
+    try:
+        with csv_path.open('r', encoding='utf-8', newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                code = (row.get('股票代码') or '').strip()
+                if not code:
+                    continue
+                data_map[code] = {
+                    'market_cap': row.get('市值_亿', '').strip(),
+                    'ret_1d': row.get('1日收益率_%', '').strip(),
+                    'ret_5d': row.get('5日收益率_%', '').strip(),
+                    'ret_10d': row.get('10日收益率_%', '').strip(),
+                    'ret_20d': row.get('20日收益率_%', '').strip(),
+                    'ret_60d': row.get('60日收益率_%', '').strip(),
+                }
+    except Exception as e:
+        return jsonify({'date': date_str, 'data': {}, 'error': str(e)})
+
+    return jsonify({'date': date_str, 'data': data_map})
+
+
+@industry_bp.route('/reports')
+def list_reports():
+    """列出 /reports 目录下的所有研究报告，按修改时间倒序，最多返回 6 篇。"""
+    if not REPORTS_DIR.exists():
+        return jsonify({'reports': []})
+
+    report_files = []
+    for f in REPORTS_DIR.iterdir():
+        if f.is_file() and f.suffix.lower() in ('.md', '.markdown'):
+            stat = f.stat()
+            content = f.read_text(encoding='utf-8')
+            # 统计中文字数（去掉标点空格等，只算中文字符+英文单词）
+            word_count = count_report_words(content)
+            report_files.append({
+                'name': f.stem,
+                'filename': f.name,
+                'mtime': stat.st_mtime,
+                'mtime_iso': format_timestamp(stat.st_mtime),
+                'size': stat.st_size,
+                'word_count': word_count,
+            })
+
+    # 按修改时间倒序
+    report_files.sort(key=lambda x: x['mtime'], reverse=True)
+
+    # 最多返回 6 篇
+    latest = report_files[:6]
+
+    return jsonify({'reports': latest})
+
+
+@industry_bp.route('/reports/raw/<path:filename>')
+def report_raw(filename):
+    """返回单篇研究报告的原始 Markdown 内容。"""
+    report_file = REPORTS_DIR / filename
+    if not report_file.exists() or not report_file.is_file():
+        abort(404, description='报告未找到')
+
+    content = report_file.read_text(encoding='utf-8')
+    return Response(content, mimetype='text/markdown; charset=utf-8')
+
+
+def count_report_words(text: str) -> int:
+    """统计报告字数：中文字符 + 英文单词数。"""
+    import re
+    # 匹配中文字符
+    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+    # 匹配英文单词
+    english_words = len(re.findall(r'[a-zA-Z]+', text))
+    return chinese_chars + english_words
+
+
+def format_timestamp(ts: float) -> str:
+    """将 Unix 时间戳格式化为 ISO 日期字符串。"""
+    import datetime
+    return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d')

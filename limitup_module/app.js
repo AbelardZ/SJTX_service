@@ -95,7 +95,7 @@ async function fetchJson(url) {
 
 async function init() {
   try {
-    showStatus("正在读取可用日期...");
+    showStatus("正在加载趋势数据...");
     const { dates } = await fetchJson("/limitup/api/dates");
     if (!dates.length) {
       showStatus("未在 sumup/data 中找到 CSV 文件");
@@ -103,26 +103,113 @@ async function init() {
     }
 
     state.dates = [...dates].sort();
-    await loadTrendData(dates);
     setupCustomRangeDefaults();
     els.dateSelect.innerHTML = dates
       .map((date) => `<option value="${escapeHtml(date)}">${escapeHtml(date)}</option>`)
       .join("");
+
+    // 阶段1: 先加载轻量级趋势聚合数据，快速渲染趋势图
+    await loadTrendDataFromAggregatedApi();
     renderTrends();
+    hideStatus();
+
+    // 阶段2: 后台加载当日详细数据（表格+统计）
     await loadDate(dates[0]);
+
+    // 阶段3: 后台静默预加载所有日期的完整数据（用于后续日期切换加速）
+    prefetchAllDailyData(dates);
   } catch (error) {
     showStatus(error.message);
   }
 }
 
-async function loadTrendData(dates) {
+async function loadTrendDataFromAggregatedApi() {
+  try {
+    const trendData = await fetchJson("/limitup/api/trend");
+    // 将聚合数据转换为 dailyData Map 格式，兼容现有 renderTrends 逻辑
+    state.dailyData.clear();
+    trendData.dates.forEach((date) => {
+      // 从聚合数据重建每行的简要数据（仅包含趋势图需要的字段）
+      const rows = [];
+      // 为每个行业创建虚拟行
+      const industrySeries = trendData.industry || {};
+      const themeSeries = trendData.theme || {};
+
+      // 用 total 系列来填充 dailyData
+      const totalForDate = (trendData.total || []).find((d) => d.date === date);
+      const count = totalForDate ? totalForDate.value : 0;
+
+      // 构建轻量行数据：每只股票一行，但只包含趋势图需要的列
+      // 实际上 renderTrends 只需要 COL.industry1 和 COL.theme
+      // 我们从聚合数据重建
+      const industryEntries = Object.entries(industrySeries);
+      const themeEntries = Object.entries(themeSeries);
+
+      // 为每个行业-日期组合创建行
+      for (const [industry, series] of industryEntries) {
+        const point = series.find((d) => d.date === date);
+        if (point && point.value > 0) {
+          for (let i = 0; i < point.value; i++) {
+            rows.push({ [COL.industry1]: industry, [COL.theme]: "" });
+          }
+        }
+      }
+      // 为每个题材-日期组合创建行（补充题材信息）
+      let rowIdx = 0;
+      for (const [theme, series] of themeEntries) {
+        const point = series.find((d) => d.date === date);
+        if (point && point.value > 0) {
+          for (let i = 0; i < point.value; i++) {
+            if (rowIdx < rows.length) {
+              rows[rowIdx][COL.theme] = rows[rowIdx][COL.theme]
+                ? rows[rowIdx][COL.theme] + "+" + theme
+                : theme;
+            } else {
+              rows.push({ [COL.industry1]: "", [COL.theme]: theme });
+            }
+            rowIdx++;
+          }
+        }
+      }
+
+      state.dailyData.set(date, rows);
+    });
+  } catch (e) {
+    // 如果聚合接口失败，回退到旧方式
+    console.warn("趋势聚合接口失败，回退到全量加载:", e);
+    await loadTrendDataFallback(state.dates);
+  }
+}
+
+async function loadTrendDataFallback(dates) {
   const payloads = await Promise.all(
     dates.map((date) => fetchJson(`/limitup/api/data?date=${encodeURIComponent(date)}`)),
   );
-
   payloads.forEach((payload) => {
     state.dailyData.set(payload.date, payload.rows || []);
   });
+}
+
+async function prefetchAllDailyData(dates) {
+  // 后台静默预加载所有日期的完整数据，加速后续日期切换
+  for (const date of dates) {
+    if (state.dailyData.has(date) && state.dailyData.get(date).length > 0) {
+      // 检查是否已有完整数据（通过检查是否有 COL.code 列）
+      const rows = state.dailyData.get(date);
+      if (rows.length > 0 && rows[0][COL.code] !== undefined) continue;
+    }
+    try {
+      const payload = await fetchJson(`/limitup/api/data?date=${encodeURIComponent(date)}`);
+      state.dailyData.set(payload.date, payload.rows || []);
+    } catch (e) {
+      // 静默失败
+    }
+  }
+}
+
+// 保留旧函数名兼容（但不再在 init 中调用）
+async function loadTrendData(dates) {
+  await loadTrendDataFromAggregatedApi();
 }
 
 function setupCustomRangeDefaults() {

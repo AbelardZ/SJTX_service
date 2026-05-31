@@ -322,20 +322,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
   gap: 14px;
 }
 
-.crowd-card {
-  border: 1px solid var(--line);
-  border-radius: var(--border-radius);
-  background: var(--surface);
-  padding: 16px;
-  transition: all 0.2s ease;
-}
-
 .crowd-card:hover { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
-
-.crowd-card-danger {
-  border-color: #e8c0c0;
-  background: linear-gradient(135deg, #fff8f6 0%, #ffffff 100%);
-}
 
 .crowd-card-head {
   display: flex;
@@ -358,24 +345,6 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
   margin-bottom: 8px;
 }
 
-.crowd-chart {
-  width: 100%;
-  height: 380px;
-}
-
-.crowd-chart-main {
-  width: 100%;
-  height: 380px;
-}
-
-.mom-card {
-  border: 1px solid var(--line);
-  border-radius: var(--border-radius);
-  background: var(--surface);
-  padding: 16px;
-  transition: all 0.2s ease;
-}
-
 .mom-card:hover { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
 
 .mom-card-highlight {
@@ -388,11 +357,6 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; }
   font-size: 12px;
   font-weight: 600;
   margin-bottom: 10px;
-}
-
-.mom-chart {
-  width: 100%;
-  height: 420px;
 }
 
 /* ---- 表格 ---- */
@@ -599,4 +563,268 @@ tbody tr:hover { background: var(--surface-soft); }
 @media (max-width: 560px) {
   h1 { font-size: 28px; }
   .summary-strip { grid-template-columns: 1fr; }
+}
+
+/* ---- 图表卡片（可滚动） ---- */
+.mom-card {
+  border: 1px solid var(--line);
+  border-radius: var(--border-radius);
+  background: var(--surface);
+  padding: 16px;
+  transition: all 0.2s ease;
+  max-height: 550px;
+  overflow-y: auto;
+}
+
+.crowd-card {
+  border: 1px solid var(--line);
+  border-radius: var(--border-radius);
+  background: var(--surface);
+  padding: 16px;
+  transition: all 0.2s ease;
+  max-height: 550px;
+  overflow-y: auto;
+}
+
+.crowd-card-danger {
+  border-color: #e8c0c0;
+  background: linear-gradient(135deg, #fff8f6 0%, #ffffff 100%);
+  max-height: 550px;
+  overflow-y: auto;
+}
+
+/* ---- 图表容器 ---- */
+.scrollable-chart {
+  width: 100%;
+}
+
+.mom-chart {
+  width: 100%;
+}
+
+.crowd-chart {
+  width: 100%;
+}
+
+.crowd-chart-main {
+  width: 100%;
+}
+
+/* ---- 层级导航布局 ---- */
+.hierarchy-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 0;
+  min-height: 500px;
+}
+
+.hierarchy-sidebar {
+  border-right: 1px solid var(--line);
+  background: var(--surface-soft);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.hierarchy-sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  border-right: 0;
+  overflow: hidden;
+}
+
+.sidebar-search-wrap {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sidebar-search {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.sidebar-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(196, 162, 74, 0.18);
+}
+
+.sidebar-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* ---- 侧边栏树节点 ---- */
+.stree-node { margin-bottom: 2px; }
+.stree-head {
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s;
+  user-select: none;
+}
+.stree-head:hover { background: rgba(196, 162, 74, 0.12); }
+.stree-l1 { font-weight: 700; color: var(--ink); }
+.stree-l2 { font-weight: 600; color: #444; padding-left: 20px; }
+.stree-l3 { font-weight: 400; color: var(--muted); padding-left: 36px; font-size: 12px; }
+.stree-arrow { font-size: 10px; color: var(--muted); transition: transform 0.2s; display: inline-block; width: 12px; }
+.stree-node.open > .stree-head .stree-arrow { transform: rotate(90deg); }
+.stree-body { display: none; }
+.stree-node.open > .stree-body { display: block; }
+
+/* ---- 层级主区域 ---- */
+.hierarchy-main {
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.hierarchy-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.hierarchy-breadcrumb {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-dark);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hierarchy-factor-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.hierarchy-factor-table {
+  min-width: 1200px;
+  font-size: 12px;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.hierarchy-factor-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  border-bottom: 2px solid var(--ink);
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.hierarchy-factor-table tbody td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hierarchy-factor-table tbody tr:hover { background: var(--surface-soft); }
+
+/* ---- K线图 ---- */
+.kline-section {
+  border: 1px solid var(--line);
+  border-radius: var(--border-radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.kline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.kline-head h3 { margin: 0; font-size: 14px; }
+
+.kline-controls label { font-size: 12px; color: var(--muted); }
+.kline-controls select {
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.kline-chart {
+  width: 100%;
+  height: 420px;
+}
+
+/* ---- 子行业指标对比 ---- */
+.children-charts-section {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--border-radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.children-charts-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.children-charts-head h3 { margin: 0; font-size: 14px; }
+
+.children-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+}
+
+.child-chart-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.child-chart-title {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.child-chart {
+  width: 100%;
+  min-height: 180px;
+}
+
+/* ---- 响应式 ---- */
+@media (max-width: 900px) {
+  .hierarchy-layout { grid-template-columns: 1fr; max-height: none; }
+  .hierarchy-sidebar { max-height: 300px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .hierarchy-sidebar.collapsed { max-height: 0; }
 }

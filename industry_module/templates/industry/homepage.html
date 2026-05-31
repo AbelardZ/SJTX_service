@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>行业全量研究</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/global-theme.css') }}?v=2" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/global-theme.css') }}?v=3" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=Noto+Sans+SC:wght@400;600;700&family=Noto+Serif+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -35,15 +35,26 @@
       flex-direction: column;
       font-family: "Noto Sans SC", "PingFang SC", "Microsoft Yahei", sans-serif;
       color: var(--ink);
-      background:
-        radial-gradient(circle at 0% 0%, rgba(47, 111, 237, 0.10) 0%, rgba(47, 111, 237, 0) 50%),
-        radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0) 42%),
-        linear-gradient(180deg, #fafcff 0%, var(--bg) 100%);
+      background: var(--bg);
       min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
     }
 
     .topbar {
-      padding: 24px 24px 10px;
+      padding: 20px 24px 14px;
+      flex-shrink: 0;
+      z-index: 300;
+      background: transparent;
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s ease, background 0.3s ease;
+    }
+
+    .topbar.scrolled {
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
     }
 
     .topbar-inner {
@@ -58,7 +69,7 @@
       font-family: "ZCOOL XiaoWei", serif;
       font-size: clamp(24px, 3.4vw, 38px);
       letter-spacing: 0.03em;
-      color: #19345c;
+      color: var(--ink);
     }
 
     .home-link {
@@ -68,8 +79,8 @@
       padding: 8px 12px;
       border: 1px solid var(--line);
       border-radius: 999px;
-      background: #ffffff;
-      color: #21477c;
+      background: var(--card);
+      color: var(--ink);
       font-size: 13px;
       font-weight: 600;
       text-decoration: none;
@@ -78,17 +89,18 @@
     .home-link:hover {
       border-color: var(--brand);
       color: var(--brand);
-      background: #f2f7ff;
+      background: var(--brand-soft);
     }
 
     .layout {
       display: grid;
       grid-template-columns: 360px minmax(0, 1fr);
       gap: 18px;
-      padding: 12px 24px 24px;
+      padding: 18px 24px 24px;
       align-items: stretch;
       flex: 1;
-      min-height: calc(100vh - 88px);
+      min-height: 0;
+      overflow: hidden;
     }
 
     .panel {
@@ -103,15 +115,28 @@
     }
 
     .panel-head {
-      padding: 14px 16px;
+      padding: 16px 18px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(110deg, #f7faff 0%, #eef4ff 100%);
+      background: var(--brand-soft);
+      flex-shrink: 0;
     }
 
     .panel-title {
       margin: 0;
       font-size: 15px;
       font-weight: 700;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-title .dot-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand);
+      flex-shrink: 0;
     }
 
     .panel-body {
@@ -119,13 +144,15 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
+      overflow-y: auto;
+      flex: 1;
     }
 
     .search {
       width: 100%;
       border: 1px solid var(--line);
       border-radius: 10px;
-      background: #ffffff;
+      background: var(--card);
       color: var(--ink);
       padding: 10px 11px;
       font-size: 14px;
@@ -142,6 +169,60 @@
       box-shadow: 0 0 0 4px rgba(47, 111, 237, 0.12);
     }
 
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-suggestions {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 20;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      box-shadow: 0 16px 32px rgba(31, 44, 66, 0.12);
+      overflow: hidden;
+      display: none;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .search-suggestion {
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      background: transparent;
+      padding: 10px 12px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .search-suggestion:last-child {
+      border-bottom: 0;
+    }
+
+    .search-suggestion:hover,
+    .search-suggestion.active {
+      background: var(--brand-soft);
+    }
+
+    .search-suggestion .primary {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .search-suggestion .secondary {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
     .tree {
       margin-top: 12px;
       flex: 1;
@@ -156,14 +237,14 @@
       border-radius: 10px;
       margin-bottom: 10px;
       overflow: hidden;
-      background: #fff;
+      background: var(--card);
       animation: reveal 0.3s ease;
     }
 
     .node-head {
       width: 100%;
       border: 0;
-      background: #fff;
+      background: var(--card);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -179,9 +260,9 @@
       color: var(--ink);
     }
 
-    .node-head-l1 { background: #f3f7ff; border-bottom: 2px solid #d7e5ff; }
-    .node-head-l2 { background: #fff; border-bottom: 1px solid #edf2fa; border-left: 3px solid #8ab0ff; }
-    .node-head-l3 { background: #fff; border-left: 3px solid #f2c66d; }
+    .node-head-l1 { background: var(--brand-soft); border-bottom: 2px solid var(--brand); border-radius: 10px 10px 0 0; }
+    .node-head-l2 { background: var(--card); border-bottom: 1px solid var(--line); border-left: 3px solid var(--brand); }
+    .node-head-l3 { background: var(--card); border-left: 3px solid var(--accent-color, #e8a820); }
 
     .node-head .meta {
       font-size: 12px;
@@ -213,7 +294,7 @@
     .leaf-btn {
       width: 100%;
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--card);
       border-radius: 8px;
       padding: 8px 10px;
       margin-bottom: 7px;
@@ -234,18 +315,21 @@
     .leaf-btn.active,
     .node-head.active {
       border-color: var(--brand);
-      background: #eaf2ff;
+      background: var(--brand-soft);
     }
 
     .detail-title {
       margin: 0;
       font-size: 18px;
+      font-weight: 700;
+      color: var(--ink);
     }
 
     .detail-sub {
       color: var(--muted);
       margin-top: 6px;
       font-size: 13px;
+      line-height: 1.5;
     }
 
     .detail-actions {
@@ -255,15 +339,7 @@
       flex-wrap: wrap;
     }
 
-    .view-switch {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 3px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: #fff;
-    }
+
 
     .switch-btn {
       border: 0;
@@ -279,6 +355,16 @@
       background: var(--brand-soft);
       color: var(--brand);
       font-weight: 700;
+    }
+
+    .view-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--card);
     }
 
     .leaf-btn {
@@ -302,8 +388,10 @@
       margin-top: 14px;
       border: 1px solid var(--line);
       border-radius: 12px;
-      overflow: hidden;
-      background: #fff;
+      overflow-y: auto;
+      background: var(--card);
+      flex: 1;
+      min-height: 0;
     }
 
     table {
@@ -315,20 +403,24 @@
     td {
       text-align: left;
       padding: 10px 12px;
-      border-bottom: 1px solid #e4ebf5;
+      border-bottom: 1px solid var(--line);
       font-size: 13px;
     }
 
     th {
-      background: #f2f6fd;
-      color: #1d3557;
+      background: #fef9e7;
+      color: var(--ink);
       position: sticky;
       top: 0;
       z-index: 1;
     }
 
+    [data-theme="dark"] th {
+      background: #2a2410;
+    }
+
     tr:hover td {
-      background: #f6faff;
+      background: var(--brand-soft);
     }
 
     .empty,
@@ -340,15 +432,15 @@
     }
 
     .empty {
-      background: #fff;
+      background: var(--card);
       color: var(--muted);
       border: 1px dashed var(--line);
     }
 
     .error {
-      background: #fff6f3;
+      background: var(--card);
       color: var(--warn);
-      border: 1px solid #e6baa9;
+      border: 1px solid var(--warn);
       line-height: 1.6;
     }
 
@@ -356,11 +448,12 @@
       margin-top: 14px;
       border: 1px solid var(--line);
       border-radius: 12px;
-      background: #fff;
+      background: var(--card);
       display: none;
       flex-direction: column;
-      min-height: 360px;
+      min-height: 0;
       overflow: hidden;
+      flex: 1;
     }
 
     .doc-head {
@@ -370,14 +463,14 @@
       gap: 10px;
       padding: 12px 14px;
       border-bottom: 1px solid var(--line);
-      background: #f7faff;
+      background: var(--brand-soft);
     }
 
     .doc-title {
       margin: 0;
       font-size: 14px;
       font-weight: 700;
-      color: #1d3557;
+      color: var(--ink);
     }
 
     .doc-actions {
@@ -389,7 +482,7 @@
     .doc-btn {
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #fff;
+      background: var(--card);
       color: var(--ink);
       font-size: 12px;
       padding: 6px 10px;
@@ -399,12 +492,15 @@
     .doc-btn:hover {
       border-color: var(--brand);
       color: var(--brand);
+      background: var(--brand-soft);
     }
 
     .doc-content {
       padding: 14px 16px;
       overflow: auto;
-      color: #24364f;
+      flex: 1;
+      min-height: 0;
+      color: var(--ink);
       line-height: 1.92;
       font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
       font-size: 17px;
@@ -416,7 +512,7 @@
     .doc-content h1,
     .doc-content h2,
     .doc-content h3 {
-      color: #17325d;
+      color: var(--ink);
       margin-top: 1.4em;
       margin-bottom: 0.62em;
       line-height: 1.45;
@@ -426,7 +522,7 @@
 
     .doc-content h1 {
       font-size: 1.7em;
-      border-bottom: 1px solid #d9e4f3;
+      border-bottom: 1px solid var(--line);
       padding-bottom: 0.35em;
     }
 
@@ -452,8 +548,8 @@
     }
 
     .doc-content pre {
-      background: #f1f5fc;
-      border: 1px solid #d9e3f1;
+      background: var(--bg-accent);
+      border: 1px solid var(--line);
       border-radius: 10px;
       padding: 12px;
       overflow: auto;
@@ -463,7 +559,7 @@
     }
 
     .doc-content code {
-      background: #eff4fc;
+      background: var(--bg-accent);
       padding: 1px 4px;
       border-radius: 4px;
       font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
@@ -482,16 +578,16 @@
 
     .doc-content th,
     .doc-content td {
-      border: 1px solid #dce6f3;
+      border: 1px solid var(--line);
       padding: 8px 10px;
     }
 
     .doc-content blockquote {
       margin: 10px 0;
       padding: 8px 12px;
-      border-left: 4px solid #8aaef8;
-      background: #f5f9ff;
-      color: #3a5275;
+      border-left: 4px solid var(--brand);
+      background: var(--brand-soft);
+      color: var(--ink);
       border-radius: 8px;
     }
 
@@ -499,7 +595,7 @@
       position: fixed;
       inset: 0;
       z-index: 1200;
-      background: #f4f8ff;
+      background: var(--bg);
       display: none;
       padding: 0;
     }
@@ -511,7 +607,7 @@
     .doc-reader {
       width: 100%;
       height: 100vh;
-      background: #fff;
+      background: var(--card);
       display: flex;
       flex-direction: column;
     }
@@ -521,14 +617,14 @@
       align-items: center;
       justify-content: space-between;
       padding: 14px 18px;
-      border-bottom: 1px solid #dce6f3;
-      background: linear-gradient(110deg, #f7faff 0%, #eef4ff 100%);
+      border-bottom: 1px solid var(--line);
+      background: var(--brand-soft);
     }
 
     .doc-reader-title {
       margin: 0;
       font-size: 18px;
-      color: #17325d;
+      color: var(--ink);
       font-weight: 700;
     }
 
@@ -540,8 +636,8 @@
     }
 
     .doc-toc {
-      border-right: 1px solid #dce6f3;
-      background: #f8fbff;
+      border-right: 1px solid var(--line);
+      background: var(--bg);
       padding: 14px;
       overflow: auto;
     }
@@ -549,7 +645,7 @@
     .doc-toc-title {
       margin: 0 0 10px;
       font-size: 14px;
-      color: #243d68;
+      color: var(--ink);
       font-weight: 700;
     }
 
@@ -563,7 +659,7 @@
       border: 0;
       background: transparent;
       text-align: left;
-      color: #51617d;
+      color: var(--muted);
       font-size: 13px;
       padding: 6px 8px;
       border-radius: 8px;
@@ -572,8 +668,8 @@
 
     .toc-item:hover,
     .toc-item.active {
-      color: #1d4fb3;
-      background: #eaf2ff;
+      color: var(--brand);
+      background: var(--brand-soft);
       font-weight: 600;
     }
 
@@ -588,6 +684,267 @@
     .doc-content-full {
       padding: 18px 24px;
       overflow: auto;
+    }
+
+    /* ---- 最新研究报告卡片（位于 layout 上方） ---- */
+    .reports-section {
+      margin: 0 24px;
+      padding: 20px 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      flex-shrink: 0;
+    }
+
+    .reports-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .reports-section-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .reports-section-title .icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 14px;
+    }
+
+    .reports-section-hint {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .reports-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .report-card {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--bg);
+      padding: 22px 24px 20px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: hidden;
+      min-height: 120px;
+    }
+
+    .report-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 16px;
+      bottom: 16px;
+      width: 4px;
+      border-radius: 0 4px 4px 0;
+      background: var(--brand);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .report-card:hover {
+      border-color: var(--brand);
+      box-shadow: 0 8px 24px rgba(47, 111, 237, 0.10);
+      background: var(--card);
+      transform: translateY(-2px);
+    }
+
+    .report-card:hover::before {
+      opacity: 1;
+    }
+
+    .report-card-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      padding-left: 4px;
+      flex: 1;
+    }
+
+    .report-card-meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 4px;
+    }
+
+    .report-card-meta .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--muted);
+      opacity: 0.4;
+    }
+
+    .report-card-arrow {
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 16px;
+      color: var(--muted);
+      opacity: 0;
+      transition: opacity 0.25s ease, color 0.25s ease;
+    }
+
+    .report-card:hover .report-card-arrow {
+      opacity: 1;
+      color: var(--brand);
+    }
+
+    .reports-empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 4px 0;
+      grid-column: 1 / -1;
+    }
+
+    /* 报告全屏阅读器 */
+    .report-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: var(--bg);
+      display: none;
+      padding: 0;
+    }
+
+    .report-overlay.show {
+      display: block;
+    }
+
+    .report-reader {
+      width: 100%;
+      height: 100vh;
+      background: var(--card);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .report-reader-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--brand-soft);
+    }
+
+    .report-reader-title {
+      margin: 0;
+      font-size: 18px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .report-reader-body {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      height: calc(100vh - 62px);
+      min-height: 0;
+    }
+
+    .report-toc {
+      border-right: 1px solid var(--line);
+      background: var(--bg);
+      padding: 14px;
+      overflow: auto;
+    }
+
+    .report-toc-title {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .report-content-full {
+      padding: 18px 24px;
+      overflow: auto;
+      color: var(--ink);
+      line-height: 1.92;
+      font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+      font-size: 17px;
+      letter-spacing: 0.01em;
+    }
+
+    .report-content-full h1,
+    .report-content-full h2,
+    .report-content-full h3 {
+      color: var(--ink);
+      margin-top: 1.4em;
+      margin-bottom: 0.62em;
+      line-height: 1.45;
+      font-family: "Noto Sans SC", "PingFang SC", "Microsoft Yahei", sans-serif;
+    }
+
+    .report-content-full h1 { font-size: 1.7em; border-bottom: 1px solid var(--line); padding-bottom: 0.35em; }
+    .report-content-full h2 { font-size: 1.35em; }
+    .report-content-full h3 { font-size: 1.12em; }
+    .report-content-full p,
+    .report-content-full ul,
+    .report-content-full ol,
+    .report-content-full blockquote { margin-top: 0.72em; margin-bottom: 0.72em; }
+    .report-content-full ul,
+    .report-content-full ol { padding-left: 1.45em; }
+    .report-content-full pre {
+      background: var(--bg-accent);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      overflow: auto;
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .report-content-full code {
+      background: var(--bg-accent);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.88em;
+    }
+    .report-content-full pre code { background: transparent; padding: 0; }
+    .report-content-full table { margin-top: 8px; border-collapse: collapse; }
+    .report-content-full th,
+    .report-content-full td { border: 1px solid var(--line); padding: 8px 10px; }
+    .report-content-full blockquote {
+      margin: 10px 0;
+      padding: 8px 12px;
+      border-left: 4px solid var(--brand);
+      background: var(--brand-soft);
+      color: var(--ink);
+      border-radius: 8px;
     }
 
     @keyframes reveal {
@@ -605,7 +962,21 @@
       .layout {
         grid-template-columns: 1fr;
         min-height: auto;
-        padding-top: 8px;
+      }
+
+      .reports-section {
+        margin: 0 12px;
+        padding: 14px 16px;
+      }
+
+      .reports-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .report-card {
+        min-height: auto;
+        padding: 16px 18px;
       }
 
       .tree {
@@ -623,7 +994,17 @@
 
       .doc-toc {
         border-right: 0;
-        border-bottom: 1px solid #dce6f3;
+        border-bottom: 1px solid var(--line);
+        max-height: 30vh;
+      }
+
+      .report-reader-body {
+        grid-template-columns: 1fr;
+      }
+
+      .report-toc {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
         max-height: 30vh;
       }
     }
@@ -637,20 +1018,37 @@
     </div>
   </header>
 
+  <!-- 最新研究报告（位于行业导航上方） -->
+  <div class="reports-section" id="reportsSection">
+    <div class="reports-section-header">
+      <h3 class="reports-section-title">
+        <span class="icon">📄</span>
+        最新研究报告
+      </h3>
+      <span class="reports-section-hint">点击卡片查看全文</span>
+    </div>
+    <div class="reports-grid" id="reportsGrid">
+      <div class="reports-empty">正在加载研究报告...</div>
+    </div>
+  </div>
+
   <main class="layout">
     <section class="panel">
       <div class="panel-head">
-        <h2 class="panel-title">申万行业导航</h2>
+        <h2 class="panel-title"><span class="dot-indicator"></span>申万行业导航</h2>
       </div>
       <div class="panel-body">
-        <input id="industrySearch" class="search" placeholder="搜索行业名称（一级/二级/三级）或 股票/文档" />
+        <div class="search-wrap">
+          <input id="industrySearch" class="search" placeholder="搜索行业名称（一级/二级/三级）或 股票/文档" />
+          <div id="searchSuggestions" class="search-suggestions" aria-label="股票搜索建议"></div>
+        </div>
         <div class="tree" id="tree"></div>
       </div>
     </section>
 
     <section class="panel">
       <div class="panel-head">
-        <h2 class="panel-title">行业数据与文档同页查看</h2>
+        <h2 class="panel-title"><span class="dot-indicator"></span>行业数据与文档同页查看</h2>
       </div>
       <div class="panel-body">
         <h3 class="detail-title" id="detailTitle">请选择左侧行业节点</h3>
@@ -666,12 +1064,19 @@
         </div>
 
         <div class="table-wrap" id="tableWrap" style="display:none;">
-          <table>
+          <div id="stockdataDate" style="padding:8px 12px;font-size:12px;color:var(--muted);background:var(--brand-soft);border-bottom:1px solid var(--line);display:none;"></div>
+          <table style="table-layout:fixed;width:100%;">
             <thead>
               <tr>
-                <th style="width: 180px;">股票代码</th>
-                <th>公司简称</th>
-                <th style="width: 160px;">三级行业</th>
+                <th style="width: 100px;">股票代码</th>
+                <th style="width: 100px;">公司简称</th>
+                <th style="width: 110px;">三级行业</th>
+                <th style="width: 85px;cursor:pointer;" id="sort-market_cap" onclick="toggleSort('market_cap')">市值（亿）<span class="sort-arrow"></span></th>
+                <th style="width: 95px;cursor:pointer;" id="sort-ret_1d" onclick="toggleSort('ret_1d')">1日收益率（%）<span class="sort-arrow"></span></th>
+                <th style="width: 95px;cursor:pointer;" id="sort-ret_5d" onclick="toggleSort('ret_5d')">5日收益率（%）<span class="sort-arrow"></span></th>
+                <th style="width: 95px;cursor:pointer;" id="sort-ret_10d" onclick="toggleSort('ret_10d')">10日收益率（%）<span class="sort-arrow"></span></th>
+                <th style="width: 95px;cursor:pointer;" id="sort-ret_20d" onclick="toggleSort('ret_20d')">20日收益率（%）<span class="sort-arrow"></span></th>
+                <th style="width: 95px;cursor:pointer;" id="sort-ret_60d" onclick="toggleSort('ret_60d')">60日收益率（%）<span class="sort-arrow"></span></th>
               </tr>
             </thead>
             <tbody id="companyRows"></tbody>
@@ -712,6 +1117,25 @@
     </div>
   </div>
 
+  <!-- 研究报告全屏阅读器 -->
+  <div class="report-overlay" id="reportOverlay">
+    <div class="report-reader">
+      <div class="report-reader-head">
+        <h3 class="report-reader-title" id="reportFullscreenTitle">研究报告</h3>
+        <div class="doc-actions">
+          <button type="button" class="doc-btn" id="reportCloseFullscreenBtn">退出全屏</button>
+        </div>
+      </div>
+      <div class="report-reader-body">
+        <aside class="report-toc">
+          <h4 class="report-toc-title">目录索引</h4>
+          <div class="toc-list" id="reportTocList"></div>
+        </aside>
+        <div class="report-content-full" id="reportFullscreenContent"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const INDUSTRY_DOC_RAW_BASE = '/industry/doc/raw/';
     const sourceCandidates = [
@@ -723,15 +1147,21 @@
 
     const appState = {
       treeData: [],
+      companyIndex: [],
       selected: null,
       industryKeyword: "",
       companyKeyword: "",
       expandedL1: new Set(),
-      expandedL2: new Set()
+      expandedL2: new Set(),
+      stockDataMap: {},
+      stockDataDate: "",
+      sortField: "",
+      sortDir: "desc"
     };
 
     const treeEl = document.getElementById("tree");
     const industrySearchEl = document.getElementById("industrySearch");
+    const searchSuggestionsEl = document.getElementById("searchSuggestions");
     const companySearchEl = document.getElementById("companySearch");
     const detailTitleEl = document.getElementById("detailTitle");
     const detailMetaEl = document.getElementById("detailMeta");
@@ -754,7 +1184,16 @@
     const docTocListEl = document.getElementById("docTocList");
     const docCloseFullscreenBtn = document.getElementById("docCloseFullscreenBtn");
 
+    // 研究报告相关 DOM
+    const reportsGridEl = document.getElementById("reportsGrid");
+    const reportOverlayEl = document.getElementById("reportOverlay");
+    const reportFullscreenTitleEl = document.getElementById("reportFullscreenTitle");
+    const reportFullscreenContentEl = document.getElementById("reportFullscreenContent");
+    const reportTocListEl = document.getElementById("reportTocList");
+    const reportCloseFullscreenBtn = document.getElementById("reportCloseFullscreenBtn");
+
     const docCache = new Map();
+    const reportCache = new Map();
     let currentDocHtml = "";
 
     appState.activeView = "company";
@@ -803,6 +1242,7 @@
     }
 
     function parseCsv(csvText) {
+      appState.companyIndex = [];
       const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
       if (lines.length === 0) {
         return [];
@@ -889,6 +1329,8 @@
           level3: level3Name
         };
 
+        appState.companyIndex.push(company);
+
         const level1Node = getOrCreateLevel1(level1Name);
         const level2Node = getOrCreateLevel2(level1Node, level2Name);
         const level3Node = getOrCreateLevel3(level2Node, level3Name);
@@ -951,10 +1393,143 @@
       return false;
     }
 
+    function normalizeKeyword(keyword) {
+      return (keyword || "").trim().toLowerCase();
+    }
+
+    function scoreCompany(company, keyword) {
+      if (!keyword) {
+        return 0;
+      }
+
+      const code = (company.code || "").toLowerCase();
+      const name = (company.name || "").toLowerCase();
+      const leaf = (company.level3 || "").toLowerCase();
+      const branch = `${company.level1 || ""} / ${company.level2 || ""} / ${company.level3 || ""}`.toLowerCase();
+
+      if (code === keyword || name === keyword) {
+        return 400;
+      }
+      if (code.startsWith(keyword) || name.startsWith(keyword)) {
+        return 300;
+      }
+      if (code.includes(keyword)) {
+        return 220;
+      }
+      if (name.includes(keyword)) {
+        return 200;
+      }
+      if (leaf.includes(keyword)) {
+        return 140;
+      }
+      if (branch.includes(keyword)) {
+        return 100;
+      }
+      return 0;
+    }
+
+    function getCompanySuggestions(keyword) {
+      const normalized = normalizeKeyword(keyword);
+      if (!normalized) {
+        return [];
+      }
+
+      return appState.companyIndex
+        .map((company) => ({
+          company,
+          score: scoreCompany(company, normalized)
+        }))
+        .filter((item) => item.score > 0)
+        .sort((left, right) => {
+          if (right.score !== left.score) {
+            return right.score - left.score;
+          }
+          return (left.company.code || "").localeCompare(right.company.code || "", "zh-Hans-CN");
+        })
+        .slice(0, 8)
+        .map((item) => item.company);
+    }
+
+    function findIndustryNodeByPath(level1Name, level2Name, level3Name) {
+      const level1Node = appState.treeData.find((node) => node.name === level1Name);
+      if (!level1Node) {
+        return null;
+      }
+
+      const level2Node = level1Node.level2.find((node) => node.name === level2Name);
+      if (!level2Node) {
+        return null;
+      }
+
+      const level3Node = level2Node.level3.find((node) => node.name === level3Name);
+      if (!level3Node) {
+        return null;
+      }
+
+      return { level1Node, level2Node, level3Node };
+    }
+
+    function renderSearchSuggestions() {
+      const suggestions = getCompanySuggestions(industrySearchEl.value || "");
+      searchSuggestionsEl.innerHTML = "";
+
+      if (!suggestions.length) {
+        searchSuggestionsEl.style.display = "none";
+        return;
+      }
+
+      suggestions.forEach((company) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "search-suggestion";
+        button.innerHTML = `
+          <span class="primary">${company.code} ${company.name}</span>
+          <span class="secondary">三级行业：${company.level1} / ${company.level2} / ${company.level3}</span>
+        `;
+        button.addEventListener("click", () => jumpToCompany(company));
+        searchSuggestionsEl.appendChild(button);
+      });
+
+      searchSuggestionsEl.style.display = "block";
+    }
+
+    function revealSelection(selection) {
+      requestAnimationFrame(() => {
+        const target = treeEl.querySelector(`[data-selection="${selectionKey(selection)}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
+
+    function jumpToCompany(company) {
+      const target = findIndustryNodeByPath(company.level1, company.level2, company.level3);
+      if (!target) {
+        return;
+      }
+
+      const selection = {
+        type: "l3",
+        path: `${company.level1}/${company.level2}/${company.level3}`,
+        name: `${company.level1} / ${company.level2} / ${company.level3}`,
+        companies: target.level3Node.companies
+      };
+
+      appState.expandedL1.add(`l1:${company.level1}`);
+      appState.expandedL2.add(`l2:${company.level1}/${company.level2}`);
+      searchSuggestionsEl.style.display = "none";
+      setSelected(selection);
+      companySearchEl.value = company.code;
+      appState.companyKeyword = company.code;
+      renderDetail();
+      revealSelection(selection);
+    }
+
     function setSelected(selection) {
       appState.selected = selection;
       appState.companyKeyword = "";
       companySearchEl.value = "";
+      searchSuggestionsEl.style.display = "none";
       renderTree();
       renderDetail();
     }
@@ -1097,6 +1672,7 @@
         l1Head.type = "button";
         l1Head.className = "node-head node-head-l1";
         const l1Sel = { type: "l1", path: l1.name, name: l1.name, companies: l1.companies };
+        l1Head.dataset.selection = selectionKey(l1Sel);
         if (appState.selected && selectionKey(appState.selected) === selectionKey(l1Sel)) {
           l1Head.classList.add("active");
         }
@@ -1128,6 +1704,7 @@
             name: `${l1.name} / ${l2.name}`,
             companies: l2.companies
           };
+          l2Head.dataset.selection = selectionKey(l2Sel);
           if (appState.selected && selectionKey(appState.selected) === selectionKey(l2Sel)) {
             l2Head.classList.add("active");
           }
@@ -1155,6 +1732,7 @@
               name: `${l1.name} / ${l2.name} / ${l3.name}`,
               companies: l3.companies
             };
+            l3Btn.dataset.selection = selectionKey(l3Sel);
             if (appState.selected && selectionKey(appState.selected) === selectionKey(l3Sel)) {
               l3Btn.classList.add("active");
             }
@@ -1191,11 +1769,24 @@
 
       const fullList = appState.selected.companies || [];
       const keyword = appState.companyKeyword.trim().toLowerCase();
-      const list = keyword
+      let list = keyword
         ? fullList.filter((item) =>
             item.code.toLowerCase().includes(keyword) || item.name.toLowerCase().includes(keyword)
           )
         : fullList;
+
+      // Apply sorting
+      if (appState.sortField) {
+        const field = appState.sortField;
+        const dir = appState.sortDir === 'asc' ? 1 : -1;
+        list = [...list].sort((a, b) => {
+          const sdA = appState.stockDataMap[a.code] || {};
+          const sdB = appState.stockDataMap[b.code] || {};
+          const va = parseFloat(sdA[field]) || 0;
+          const vb = parseFloat(sdB[field]) || 0;
+          return (va - vb) * dir;
+        });
+      }
 
       detailTitleEl.textContent = appState.selected.name;
       detailMetaEl.textContent = `共 ${fullList.length} 家公司，当前显示 ${list.length} 家。`;
@@ -1220,17 +1811,62 @@
       emptyStateEl.style.display = "none";
 
       companyRowsEl.innerHTML = "";
+      const stockdataDateEl = document.getElementById("stockdataDate");
+      if (appState.stockDataDate) {
+        stockdataDateEl.style.display = "block";
+        stockdataDateEl.textContent = `数据更新日期：${appState.stockDataDate}`;
+      } else {
+        stockdataDateEl.style.display = "none";
+      }
+
       if (list.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = "<td colspan=\"3\" style=\"color:#5f6f5f;\">无匹配公司</td>";
+        row.innerHTML = "<td colspan=\"9\" style=\"color:var(--muted);\">无匹配公司</td>";
         companyRowsEl.appendChild(row);
         return;
       }
 
       list.forEach((company) => {
+        const sd = appState.stockDataMap[company.code] || {};
+        const retFields = ['ret_1d', 'ret_5d', 'ret_10d', 'ret_20d', 'ret_60d'];
+        const retCells = retFields.map(field => {
+          const val = sd[field];
+          if (!val || val === '-') return '<td>-</td>';
+          const num = parseFloat(val);
+          if (isNaN(num)) return `<td>${val}</td>`;
+          const color = num > 0 ? '#d44' : num < 0 ? '#3a8' : '';
+          return `<td style="color:${color}">${val}</td>`;
+        }).join('');
         const row = document.createElement("tr");
-        row.innerHTML = `<td>${company.code}</td><td>${company.name}</td><td>${company.level3}</td>`;
+        row.innerHTML = `<td>${company.code}</td><td>${company.name}</td><td>${company.level3}</td><td>${sd.market_cap || '-'}</td>${retCells}`;
         companyRowsEl.appendChild(row);
+      });
+
+      updateSortArrows();
+    }
+
+    function toggleSort(field) {
+      if (appState.sortField === field) {
+        appState.sortDir = appState.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        appState.sortField = field;
+        appState.sortDir = 'desc';
+      }
+      renderDetail();
+    }
+
+    function updateSortArrows() {
+      const sortableFields = ['market_cap', 'ret_1d', 'ret_5d', 'ret_10d', 'ret_20d', 'ret_60d'];
+      sortableFields.forEach(field => {
+        const th = document.getElementById('sort-' + field);
+        if (!th) return;
+        const arrow = th.querySelector('.sort-arrow');
+        if (!arrow) return;
+        if (appState.sortField === field) {
+          arrow.textContent = appState.sortDir === 'asc' ? ' ▲' : ' ▼';
+        } else {
+          arrow.textContent = '';
+        }
       });
     }
 
@@ -1255,7 +1891,20 @@
 
     industrySearchEl.addEventListener("input", (e) => {
       appState.industryKeyword = e.target.value || "";
+      renderSearchSuggestions();
       renderTree();
+    });
+
+    industrySearchEl.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      const suggestions = getCompanySuggestions(industrySearchEl.value || "");
+      if (suggestions.length > 0) {
+        event.preventDefault();
+        jumpToCompany(suggestions[0]);
+      }
     });
 
     companySearchEl.addEventListener("input", (e) => {
@@ -1294,6 +1943,148 @@
       }
     });
 
+    async function loadStockData() {
+      try {
+        const res = await fetch('/industry/stockdata/latest', { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.data && Object.keys(json.data).length > 0) {
+          appState.stockDataMap = json.data;
+          appState.stockDataDate = json.date || '';
+        }
+      } catch (err) {
+        // Silently ignore — stock data is optional
+      }
+    }
+
+    // ========== 研究报告相关 ==========
+
+    async function loadReports() {
+      try {
+        const res = await fetch('/industry/reports', { cache: "no-store" });
+        if (!res.ok) throw new Error('加载报告列表失败');
+        const json = await res.json();
+        renderReports(json.reports || []);
+      } catch (err) {
+        reportsGridEl.innerHTML = '<div class="reports-empty">加载研究报告失败</div>';
+      }
+    }
+
+    function renderReports(reports) {
+      if (!reports.length) {
+        reportsGridEl.innerHTML = '<div class="reports-empty">暂无研究报告</div>';
+        return;
+      }
+
+      reportsGridEl.innerHTML = '';
+      reports.forEach((report) => {
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        card.title = `点击查看：${report.name}`;
+        card.innerHTML = `
+          <div class="report-card-name">${report.name}</div>
+          <div class="report-card-meta">
+            <span>${report.mtime_iso}</span>
+            <span class="dot"></span>
+            <span>${formatWordCount(report.word_count)}</span>
+          </div>
+          <span class="report-card-arrow">→</span>
+        `;
+        card.addEventListener('click', () => openReport(report));
+        reportsGridEl.appendChild(card);
+      });
+    }
+
+    function formatWordCount(count) {
+      if (!count || count === 0) return '0 字';
+      if (count >= 10000) return (count / 10000).toFixed(1) + ' 万字';
+      return count.toLocaleString() + ' 字';
+    }
+
+    function buildReportToc(container) {
+      const headings = Array.from(container.querySelectorAll("h1, h2, h3"));
+      const items = [];
+      headings.forEach((el, idx) => {
+        const text = (el.textContent || "").trim();
+        if (!text) return;
+        el.id = `report-fs-anchor-${idx}`;
+        items.push({
+          id: el.id,
+          title: text,
+          level: Number(el.tagName.slice(1)) || 1
+        });
+      });
+      return items;
+    }
+
+    function renderReportToc() {
+      const tocItems = buildReportToc(reportFullscreenContentEl);
+      reportTocListEl.innerHTML = "";
+      if (!tocItems.length) {
+        reportTocListEl.innerHTML = '<div class="hint" style="margin-top:0;">当前文档暂无可索引标题。</div>';
+        return;
+      }
+
+      tocItems.forEach((item, index) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `toc-item level-${Math.min(item.level, 3)}`;
+        btn.textContent = item.title;
+        btn.addEventListener("click", () => {
+          const target = reportFullscreenContentEl.querySelector(`#${item.id}`);
+          if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+          Array.from(reportTocListEl.children).forEach((el) => el.classList.remove("active"));
+          btn.classList.add("active");
+        });
+        if (index === 0) btn.classList.add("active");
+        reportTocListEl.appendChild(btn);
+      });
+    }
+
+    async function openReport(report) {
+      reportFullscreenTitleEl.textContent = report.name;
+      reportFullscreenContentEl.innerHTML = '<div class="hint">正在加载报告...</div>';
+      reportOverlayEl.classList.add("show");
+      document.body.style.overflow = "hidden";
+
+      // 检查缓存
+      if (reportCache.has(report.filename)) {
+        const cached = reportCache.get(report.filename);
+        reportFullscreenContentEl.innerHTML = cached;
+        renderReportToc();
+        return;
+      }
+
+      try {
+        const res = await fetch(`/industry/reports/raw/${encodeURIComponent(report.filename)}`, { cache: "no-store" });
+        if (!res.ok) throw new Error('报告读取失败');
+        const text = await res.text();
+        const html = marked.parse(text || "");
+        reportCache.set(report.filename, html);
+        reportFullscreenContentEl.innerHTML = html;
+        renderReportToc();
+      } catch (err) {
+        reportFullscreenContentEl.innerHTML = '<div class="error" style="display:block;margin-top:0;">报告加载失败，请稍后重试。</div>';
+        reportTocListEl.innerHTML = '<div class="hint" style="margin-top:0;">暂无目录索引。</div>';
+      }
+    }
+
+    reportCloseFullscreenBtn.addEventListener("click", () => {
+      reportOverlayEl.classList.remove("show");
+      document.body.style.overflow = "";
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && reportOverlayEl.classList.contains("show")) {
+        reportOverlayEl.classList.remove("show");
+        document.body.style.overflow = "";
+      }
+    });
+
+    // ========== 初始化 ==========
+
     (async function bootstrap() {
       try {
         const csvText = await loadCsv();
@@ -1303,11 +2094,19 @@
         }
 
         appState.treeData = data;
+        await Promise.all([loadStockData(), loadReports()]);
         renderTree();
         renderDetail();
       } catch (err) {
         showError(err.message || "页面初始化失败");
       }
+    })();
+
+    // 修复表格标题行背景为不透明（覆盖 global-theme.css 的半透明变量）
+    (function fixTableHeader() {
+      const style = document.createElement('style');
+      style.textContent = 'th{background:#edf4ff!important}[data-theme="dark"] th{background:#1e293b!important}';
+      document.head.appendChild(style);
     })();
   </script>
 </body>

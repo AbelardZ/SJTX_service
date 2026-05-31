@@ -2,13 +2,14 @@
 const state = {
   dates: [],
   currentDate: "",
-  currentLevel: "sw1",
+  currentLevel: "sw3",
   rows: [],
   momentumWindow: 20,
   volWindow: 20,
   crowdingWindow: 20,
-  tableFilterGroup: "all",
-  expandedIdx: null,
+  industryTree: [],
+  selectedNode: null,
+  klineChart: null,
 };
 
 // ---- DOM 引用 ----
@@ -19,12 +20,19 @@ const els = {
   industryCount: document.getElementById("industryCount"),
   topMomentum: document.getElementById("topMomentum"),
   topCrowding: document.getElementById("topCrowding"),
-  tableSearch: document.getElementById("tableSearch"),
-  factorTableBody: document.querySelector("#factorTable tbody"),
   docButton: document.getElementById("docButton"),
   docModal: document.getElementById("docModal"),
   docContent: document.getElementById("docContent"),
   closeDocModal: document.getElementById("closeDocModal"),
+  sidebarTree: document.getElementById("sidebarTree"),
+  sidebarSearch: document.getElementById("sidebarSearch"),
+  toggleSidebar: document.getElementById("toggleSidebar"),
+  hierarchySidebar: document.getElementById("hierarchySidebar"),
+  hierarchyPlaceholder: document.getElementById("hierarchyPlaceholder"),
+  hierarchyContent: document.getElementById("hierarchyContent"),
+  hierarchyBreadcrumb: document.getElementById("hierarchyBreadcrumb"),
+  hierarchyFactorBody: document.getElementById("hierarchyFactorBody"),
+  klineDays: document.getElementById("klineDays"),
 };
 
 // ---- 图表实例 ----
@@ -33,13 +41,14 @@ const charts = {};
 function initChart(domId) {
   const dom = document.getElementById(domId);
   if (!dom) return null;
+  if (charts[domId]) charts[domId].dispose();
   const instance = echarts.init(dom);
   charts[domId] = instance;
   return instance;
 }
 
 function resizeAllCharts() {
-  Object.values(charts).forEach((c) => c.resize());
+  Object.values(charts).forEach((c) => { try { c.resize(); } catch(e) {} });
 }
 
 window.addEventListener("resize", () => {
@@ -48,98 +57,90 @@ window.addEventListener("resize", () => {
 });
 
 // ---- API ----
-async function fetchDates() {
-  const resp = await fetch("/industryrotation/api/dates");
+async function fetchJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }
 
-async function fetchData(date, level) {
-  const resp = await fetch(`/industryrotation/api/data?date=${date}&level=${level}`);
-  return resp.json();
-}
+async function fetchDates(level) { return fetchJSON(`/industryrotation/api/dates?level=${level}`); }
+async function fetchData(date, level) { return fetchJSON(`/industryrotation/api/data?date=${date}&level=${level}`); }
+async function fetchTree() { return fetchJSON("/industryrotation/api/tree"); }
+async function fetchKline(level, name) { return fetchJSON(`/industryrotation/api/kline?level=${level}&name=${encodeURIComponent(name)}`); }
 
 // ---- 初始化 ----
 async function init() {
-  // 初始化所有图表
+  // 阶段1: 先初始化首屏必需的图表实例（动量2个 + 拥挤度主图1个）
   initChart("rsMomentumChart");
   initChart("returnMomentumChart");
-  initChart("closeVolChart");
-  initChart("intradayVolChart");
-  initChart("amountCrowdingChart");
-  initChart("priceDevCrowdingChart");
-  initChart("rsCrowdingChart");
   initChart("equalCrowdingChart");
 
-  // 加载日期
-  state.dates = await fetchDates();
+  state.dates = await fetchDates(state.currentLevel);
   renderDateOptions();
 
-  // 加载默认数据
+  // Load industry tree for sidebar
+  try { state.industryTree = await fetchTree(); } catch(e) { state.industryTree = []; }
+  renderSidebarTree();
+
+  // 阶段2: 加载数据并渲染首屏图表
   await loadData();
 
-  // 事件绑定
+  // 阶段3: 延迟初始化非首屏图表（波动率、拥挤度子图），用 requestIdleCallback 或 setTimeout
+  scheduleDeferredCharts();
+
   els.dateSelect.addEventListener("change", loadData);
-  els.levelSelect.addEventListener("change", () => {
-    state.currentLevel = els.levelSelect.value;
-    loadData();
-  });
-  els.tableSearch.addEventListener("input", renderTable);
+  els.levelSelect.addEventListener("change", async () => { state.currentLevel = els.levelSelect.value; state.dates = await fetchDates(state.currentLevel); renderDateOptions(); loadData(); });
+  els.sidebarSearch.addEventListener("input", renderSidebarTree);
+  els.toggleSidebar.addEventListener("click", () => { els.hierarchySidebar.classList.toggle("collapsed"); });
+  els.klineDays.addEventListener("change", () => { if (state.selectedNode) loadKline(state.selectedNode); });
 
-  // 表格分类筛选
-  document.querySelectorAll(".filter-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".filter-tab").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      state.tableFilterGroup = btn.dataset.group;
-      // 折叠所有展开行并重置箭头
-      document.querySelectorAll(".expand-row").forEach((r) => (r.hidden = true));
-      document.querySelectorAll(".expand-arrow").forEach((a) => (a.textContent = "▶"));
-      state.expandedIdx = null;
-      applyTableColumnFilter();
-    });
-  });
-
-  // 文档模态框
+  // Doc modal
   els.docButton.addEventListener("click", openDocModal);
   els.closeDocModal.addEventListener("click", closeDocModal);
-  els.docModal.addEventListener("click", (e) => {
-    if (e.target === els.docModal) closeDocModal();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !els.docModal.hidden) closeDocModal();
-  });
+  els.docModal.addEventListener("click", (e) => { if (e.target === els.docModal) closeDocModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !els.docModal.hidden) closeDocModal(); });
 
-  // 动量窗口切换
+  // Momentum tabs
   document.querySelectorAll(".momentum-tabs").forEach((group) => {
     group.addEventListener("click", (e) => {
       const btn = e.target.closest(".mom-tab");
       if (!btn) return;
       group.querySelectorAll(".mom-tab").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      const window = parseInt(btn.dataset.window);
-
-      if (group.id === "volTabs") {
-        state.volWindow = window;
-        renderVolatilityCharts();
-      } else if (group.id === "crowdingTabs") {
-        state.crowdingWindow = window;
-        renderCrowdingCharts();
-      } else {
-        state.momentumWindow = window;
-        renderMomentumCharts();
-      }
+      const w = parseInt(btn.dataset.window);
+      if (group.id === "volTabs") { state.volWindow = w; renderVolatilityCharts(); }
+      else if (group.id === "crowdingTabs") { state.crowdingWindow = w; renderCrowdingCharts(); }
+      else { state.momentumWindow = w; renderMomentumCharts(); }
     });
   });
 }
 
-function renderDateOptions() {
-  els.dateSelect.innerHTML = state.dates
-    .map((d) => `<option value="${d}">${d}</option>`)
-    .join("");
-  if (state.dates.length > 0) {
-    state.currentDate = state.dates[0];
-    els.dateSelect.value = state.currentDate;
+function scheduleDeferredCharts() {
+  // 使用 requestIdleCallback 或 setTimeout 延迟初始化非首屏图表
+  const deferredInit = () => {
+    // 初始化波动率图表
+    initChart("closeVolChart");
+    initChart("intradayVolChart");
+    // 初始化拥挤度子图表
+    initChart("amountCrowdingChart");
+    initChart("priceDevCrowdingChart");
+    initChart("rsCrowdingChart");
+
+    // 渲染延迟的图表
+    renderVolatilityCharts();
+    renderCrowdingCharts();
+  };
+
+  if (window.requestIdleCallback) {
+    requestIdleCallback(deferredInit, { timeout: 300 });
+  } else {
+    setTimeout(deferredInit, 100);
   }
+}
+
+function renderDateOptions() {
+  els.dateSelect.innerHTML = state.dates.map((d) => `<option value="${d}">${d}</option>`).join("");
+  if (state.dates.length > 0) { state.currentDate = state.dates[0]; els.dateSelect.value = state.currentDate; }
 }
 
 async function loadData() {
@@ -152,14 +153,42 @@ async function loadData() {
       const num = parseFloat(v);
       out[k] = isNaN(num) ? v : num;
     }
+    // Add short name (last segment after last "-")
+    if (out.stock_name) {
+      const parts = out.stock_name.split("-");
+      out.short_name = parts[parts.length - 1];
+    }
     return out;
   });
 
+  // 确保首屏图表实例正确
+  ["rsMomentumChart", "returnMomentumChart", "equalCrowdingChart"].forEach(id => {
+    const dom = document.getElementById(id);
+    if (dom && charts[id]) {
+      charts[id].resize();
+    } else if (dom) {
+      if (charts[id]) charts[id].dispose();
+      charts[id] = echarts.init(dom);
+    }
+  });
+
+  // 首屏渲染：摘要 + 动量 + 等权拥挤度主图
   renderSummary();
   renderMomentumCharts();
-  renderVolatilityCharts();
-  renderCrowdingCharts();
-  renderTable();
+  renderCrowdingMainChartOnly();
+
+  // 延迟图表如果已经初始化则渲染
+  if (charts["closeVolChart"]) {
+    renderVolatilityCharts();
+    renderCrowdingCharts();
+  }
+}
+
+// 仅渲染等权复合拥挤度主图（首屏用）
+function renderCrowdingMainChartOnly() {
+  const w = state.crowdingWindow;
+  const heatColor = (v) => { if (v > 0.85) return "#e03030"; if (v > 0.7) return "#e87040"; if (v > 0.55) return "#d4a020"; if (v > 0.4) return "#8ab830"; return "#3a9d6e"; };
+  renderCrowdingMainChart("equalCrowdingChart", state.rows, `equal_weight_crowding_${w}`, heatColor);
 }
 
 // ---- 摘要 ----
@@ -167,623 +196,415 @@ function renderSummary() {
   const rows = state.rows.filter((r) => !isNaN(r.rs_momentum_20));
   els.dataDate.textContent = state.currentDate;
   els.industryCount.textContent = rows.length;
-
-  if (rows.length === 0) {
-    els.topMomentum.textContent = "-";
-    els.topCrowding.textContent = "-";
-    return;
-  }
-
-  const topRS = rows.reduce((a, b) =>
-    (a.rs_momentum_20 || -Infinity) > (b.rs_momentum_20 || -Infinity) ? a : b
-  );
+  if (rows.length === 0) { els.topMomentum.textContent = "-"; els.topCrowding.textContent = "-"; return; }
+  const topRS = rows.reduce((a, b) => (a.rs_momentum_20 || -Infinity) > (b.rs_momentum_20 || -Infinity) ? a : b);
   els.topMomentum.textContent = topRS.stock_name || "-";
-
-  const topCrowd = rows.reduce((a, b) =>
-    (a.equal_weight_crowding_20 || -Infinity) > (b.equal_weight_crowding_20 || -Infinity) ? a : b
-  );
+  const topCrowd = rows.reduce((a, b) => (a.equal_weight_crowding_20 || -Infinity) > (b.equal_weight_crowding_20 || -Infinity) ? a : b);
   els.topCrowding.textContent = `${topCrowd.stock_name || "-"} (${((topCrowd.equal_weight_crowding_20 || 0) * 100).toFixed(0)}%)`;
 }
 
-// ---- 水平条形图通用渲染 ----
-function renderHorizontalBar(domId, rows, valueKey, title, unit, colorFunc) {
+// ---- 水平条形图（动态高度 + 卡片滚动） ----
+function renderScrollableBar(domId, rows, valueKey, title, unit, colorFunc, maxItems) {
   const chart = charts[domId];
   if (!chart) return;
+  const valid = rows.filter((r) => !isNaN(r[valueKey]) && (r.short_name || r.stock_name)).sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0));
+  if (valid.length === 0) { chart.clear(); return; }
+  const limit = maxItems || valid.length;
+  const sliced = valid.slice(0, limit);
+  const names = sliced.map((r) => r.short_name || r.stock_name).reverse();
+  const values = sliced.map((r) => r[valueKey]).reverse();
+  const barH = Math.max(16, Math.min(24, Math.floor(400 / names.length)));
+  const h = Math.max(300, names.length * (barH + 4) + 40);
+  const dom = document.getElementById(domId);
+  if (dom) dom.style.height = h + "px";
 
-  const valid = rows
-    .filter((r) => !isNaN(r[valueKey]) && r.stock_name)
-    .sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0))
-    .slice(0, 20);
-
-  if (valid.length === 0) {
-    chart.clear();
-    return;
-  }
-
-  const names = valid.map((r) => r.stock_name).reverse();
-  const values = valid.map((r) => r[valueKey]).reverse();
-
-  const option = {
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      formatter: (params) => {
-        const p = params[0];
-        const v = p.value;
-        return `${p.name}<br/>${valueKey}: ${v != null ? v.toFixed(4) : "-"}${unit}`;
-      },
-    },
-    grid: { left: 100, right: 40, top: 8, bottom: 8 },
-    xAxis: {
-      type: "value",
-      axisLabel: { fontSize: 10, color: "#aaa" },
-      splitLine: { lineStyle: { color: "#f0ede4" } },
-    },
-    yAxis: {
-      type: "category",
-      data: names,
-      axisLabel: { fontSize: 11, color: "#444", width: 90, overflow: "truncate" },
-      axisTick: { show: false },
-      axisLine: { show: false },
-    },
-    series: [
-      {
-        type: "bar",
-        data: values.map((v, i) => {
-          const baseColor = colorFunc ? colorFunc(v, i) : "#c4a24a";
-          return {
-            value: v,
-            itemStyle: {
-              borderRadius: [0, 4, 4, 0],
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                { offset: 0, color: baseColor },
-                { offset: 1, color: baseColor + "cc" },
-              ]),
-            },
-          };
-        }),
-        barMaxWidth: 18,
-        emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowColor: "rgba(0,0,0,0.15)",
-          },
-        },
-        label: {
-          show: true,
-          position: "right",
-          fontSize: 10,
-          color: "#999",
-          formatter: (p) => (p.value != null ? p.value.toFixed(3) : "-"),
-        },
-      },
-    ],
-  };
-
-  chart.setOption(option, true);
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, formatter: (p) => `${p[0].name}<br/>${valueKey}: ${p[0].value != null ? p[0].value.toFixed(4) : "-"}${unit}` },
+    grid: { left: 100, right: 50, top: 8, bottom: 8 },
+    xAxis: { type: "value", axisLabel: { fontSize: 10, color: "#aaa" }, splitLine: { lineStyle: { color: "#f0ede4" } } },
+    yAxis: { type: "category", data: names, axisLabel: { fontSize: 11, color: "#444", width: 90, overflow: "truncate" }, axisTick: { show: false }, axisLine: { show: false } },
+    series: [{
+      type: "bar", data: values.map((v) => ({ value: v, itemStyle: { borderRadius: [0, 4, 4, 0], color: colorFunc ? colorFunc(v) : "#c4a24a" } })),
+      label: { show: true, position: "right", fontSize: 10, color: "#999", formatter: (p) => (p.value != null && typeof p.value === 'number') ? p.value.toFixed(3) : "-" },
+    }],
+  }, true);
 }
 
 // ---- 动量图表 ----
 function renderMomentumCharts() {
   const w = state.momentumWindow;
   const rows = state.rows;
-
-  // 热力色阶：深红(强正) → 浅红 → 白(零) → 浅绿 → 深绿(强负)
   const heatColor = (v) => {
-    if (v > 0.08) return "#d03030";
-    if (v > 0.04) return "#e86050";
-    if (v > 0.02) return "#f09080";
-    if (v > 0) return "#f5c0b8";
-    if (v > -0.02) return "#c0e0c0";
-    if (v > -0.04) return "#80c880";
-    if (v > -0.08) return "#40a850";
-    return "#208838";
+    if (v > 0.08) return "#d03030"; if (v > 0.04) return "#e86050"; if (v > 0.02) return "#f09080";
+    if (v > 0) return "#f5c0b8"; if (v > -0.02) return "#c0e0c0"; if (v > -0.04) return "#80c880";
+    if (v > -0.08) return "#40a850"; return "#208838";
   };
-
-  renderMomentumMainChart("rsMomentumChart", rows, `rs_momentum_${w}`, "RS 动量（相对大盘）", heatColor);
-  renderMomentumMainChart("returnMomentumChart", rows, `return_momentum_${w}`, "收益动量（绝对收益）", heatColor);
+  renderMomentumMainChart("rsMomentumChart", rows, `rs_momentum_${w}`, "RS 动量", heatColor);
+  renderMomentumMainChart("returnMomentumChart", rows, `return_momentum_${w}`, "收益动量", heatColor);
 }
 
 function renderMomentumMainChart(domId, rows, valueKey, title, colorFunc) {
   const chart = charts[domId];
   if (!chart) return;
-
-  const valid = rows
-    .filter((r) => !isNaN(r[valueKey]) && r.stock_name)
-    .sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0))
-    .slice(0, 20);
-
+  const valid = rows.filter((r) => !isNaN(r[valueKey]) && (r.short_name || r.stock_name)).sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0));
   if (valid.length === 0) { chart.clear(); return; }
-
-  const names = valid.map((r) => r.stock_name).reverse();
+  const names = valid.map((r) => r.short_name || r.stock_name).reverse();
   const values = valid.map((r) => r[valueKey]).reverse();
+  const barH = Math.max(16, Math.min(24, Math.floor(350 / names.length)));
+  const h = Math.max(300, names.length * (barH + 4) + 40);
+  const dom = document.getElementById(domId);
+  if (dom) dom.style.height = h + "px";
 
-  const option = {
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      formatter: (params) => {
-        const p = params[0];
-        const v = p.value;
-        const pct = v != null ? (v * 100).toFixed(2) : "-";
-        const arrow = v > 0 ? "📈" : v < 0 ? "📉" : "➖";
-        return `<b>${p.name}</b><br/>${title}: <b>${arrow} ${pct}%</b>`;
-      },
-    },
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, formatter: (p) => { const v = p[0].value; const pct = v != null ? (v * 100).toFixed(2) : "-"; return `<b>${p[0].name}</b><br/>${title}: <b>${v > 0 ? "📈" : v < 0 ? "📉" : "➖"} ${pct}%</b>`; } },
     grid: { left: 100, right: 50, top: 8, bottom: 8 },
-    xAxis: {
-      type: "value",
-      axisLabel: { fontSize: 10, color: "#aaa", formatter: (v) => (v * 100).toFixed(0) + "%" },
-      splitLine: { lineStyle: { color: "#f0ede4" } },
-    },
-    yAxis: {
-      type: "category",
-      data: names,
-      axisLabel: { fontSize: 11, color: "#444", width: 90, overflow: "truncate", fontWeight: "bold" },
-      axisTick: { show: false },
-      axisLine: { show: false },
-    },
-    series: [
-      {
-        type: "bar",
-        data: values.map((v) => ({
-          value: v,
-          itemStyle: {
-            borderRadius: [0, 6, 6, 0],
-            color: colorFunc(v),
-          },
-        })),
-        barMaxWidth: 22,
-        emphasis: {
-          itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.15)" },
-        },
-        label: {
-          show: true,
-          position: "right",
-          fontSize: 11,
-          fontWeight: "bold",
-          color: "#555",
-          formatter: (p) => (p.value != null ? (p.value * 100).toFixed(1) + "%" : "-"),
-        },
-        markLine: {
-          silent: true,
-          symbol: "none",
-          lineStyle: { type: "dashed", color: "#ccc", width: 1 },
-          data: [{ xAxis: 0, label: { formatter: "0%", fontSize: 10, color: "#999" } }],
-        },
-      },
-    ],
-  };
-
-  chart.setOption(option, true);
+    xAxis: { type: "value", axisLabel: { fontSize: 10, color: "#aaa", formatter: (v) => (v * 100).toFixed(0) + "%" }, splitLine: { lineStyle: { color: "#f0ede4" } } },
+    yAxis: { type: "category", data: names, axisLabel: { fontSize: 11, color: "#444", width: 90, overflow: "truncate", fontWeight: "bold" }, axisTick: { show: false }, axisLine: { show: false } },
+    series: [{ type: "bar", data: values.map((v) => ({ value: v, itemStyle: { borderRadius: [0, 6, 6, 0], color: colorFunc(v) } })),
+      label: { show: true, position: "right", fontSize: 11, fontWeight: "bold", color: "#555", formatter: (p) => p.value != null ? (p.value * 100).toFixed(1) + "%" : "-" },
+      markLine: { silent: true, symbol: "none", lineStyle: { type: "dashed", color: "#ccc", width: 1 }, data: [{ xAxis: 0, label: { formatter: "0%", fontSize: 10, color: "#999" } }] },
+    }],
+  }, true);
 }
 
 // ---- 波动率图表 ----
 function renderVolatilityCharts() {
   const w = state.volWindow;
-  const rows = state.rows;
-
-  const volColor = (v) => {
-    if (v > 0.5) return "#c44a4a";
-    if (v > 0.3) return "#c4a24a";
-    return "#4a9d6e";
-  };
-
-  renderHorizontalBar("closeVolChart", rows, `close_vol_${w}`, "收盘波动率", "", volColor);
-  renderHorizontalBar("intradayVolChart", rows, `intraday_vol_${w}`, "日内波动率", "", volColor);
+  const volColor = (v) => { if (v > 0.5) return "#c44a4a"; if (v > 0.3) return "#c4a24a"; return "#4a9d6e"; };
+  renderScrollableBar("closeVolChart", state.rows, `close_vol_${w}`, "收盘波动率", "", volColor, 0);
+  renderScrollableBar("intradayVolChart", state.rows, `intraday_vol_${w}`, "日内波动率", "", volColor, 0);
 }
 
 // ---- 拥挤度图表 ----
 function renderCrowdingCharts() {
   const w = state.crowdingWindow;
-  const rows = state.rows;
-
-  // 热力色阶：红(>0.8) → 橙(>0.6) → 金(>0.4) → 绿(<0.4)
-  const heatColor = (v) => {
-    if (v > 0.85) return "#e03030";
-    if (v > 0.7) return "#e87040";
-    if (v > 0.55) return "#d4a020";
-    if (v > 0.4) return "#8ab830";
-    return "#3a9d6e";
-  };
-
-  renderCrowdingMainChart("equalCrowdingChart", rows, `equal_weight_crowding_${w}`, heatColor);
-  renderHorizontalBar("amountCrowdingChart", rows, `amount_share_crowding_${w}`, "成交额占比拥挤度", "", heatColor);
-  renderHorizontalBar("priceDevCrowdingChart", rows, `price_deviation_crowding_${w}`, "乖离率拥挤度", "", heatColor);
-  renderHorizontalBar("rsCrowdingChart", rows, `rs_crowding_${w}`, "RS拥挤度", "", heatColor);
+  const heatColor = (v) => { if (v > 0.85) return "#e03030"; if (v > 0.7) return "#e87040"; if (v > 0.55) return "#d4a020"; if (v > 0.4) return "#8ab830"; return "#3a9d6e"; };
+  renderCrowdingMainChart("equalCrowdingChart", state.rows, `equal_weight_crowding_${w}`, heatColor);
+  renderScrollableBar("amountCrowdingChart", state.rows, `amount_share_crowding_${w}`, "成交额占比拥挤度", "", heatColor, 0);
+  renderScrollableBar("priceDevCrowdingChart", state.rows, `price_deviation_crowding_${w}`, "乖离率拥挤度", "", heatColor, 0);
+  renderScrollableBar("rsCrowdingChart", state.rows, `rs_crowding_${w}`, "RS拥挤度", "", heatColor, 0);
 }
 
 function renderCrowdingMainChart(domId, rows, valueKey, colorFunc) {
   const chart = charts[domId];
   if (!chart) return;
-
-  const valid = rows
-    .filter((r) => !isNaN(r[valueKey]) && r.stock_name)
-    .sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0))
-    .slice(0, 20);
-
+  const valid = rows.filter((r) => !isNaN(r[valueKey]) && (r.short_name || r.stock_name)).sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0));
   if (valid.length === 0) { chart.clear(); return; }
-
-  const names = valid.map((r) => r.stock_name).reverse();
+  const names = valid.map((r) => r.short_name || r.stock_name).reverse();
   const values = valid.map((r) => r[valueKey]).reverse();
+  const barH = Math.max(16, Math.min(24, Math.floor(350 / names.length)));
+  const h = Math.max(300, names.length * (barH + 4) + 40);
+  const dom = document.getElementById(domId);
+  if (dom) dom.style.height = h + "px";
 
-  const option = {
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      formatter: (params) => {
-        const p = params[0];
-        const v = p.value;
-        const pct = v != null ? (v * 100).toFixed(0) : "-";
-        let level = "🟢 低";
-        if (v > 0.8) level = "🔴 过热";
-        else if (v > 0.6) level = "🟠 偏高";
-        else if (v > 0.4) level = "🟡 中等";
-        return `<b>${p.name}</b><br/>等权复合拥挤度: <b>${pct}%</b><br/>风险等级: ${level}`;
-      },
-    },
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, formatter: (p) => { const v = p[0].value; const pct = v != null ? (v * 100).toFixed(0) : "-"; let level = "🟢 低"; if (v > 0.8) level = "🔴 过热"; else if (v > 0.6) level = "🟠 偏高"; else if (v > 0.4) level = "🟡 中等"; return `<b>${p[0].name}</b><br/>等权复合拥挤度: <b>${pct}%</b><br/>风险等级: ${level}`; } },
     grid: { left: 100, right: 50, top: 8, bottom: 8 },
-    xAxis: {
-      type: "value",
-      min: 0,
-      max: 1,
-      axisLabel: { fontSize: 10, color: "#aaa", formatter: (v) => (v * 100).toFixed(0) + "%" },
-      splitLine: { lineStyle: { color: "#f0ede4" } },
-    },
-    yAxis: {
-      type: "category",
-      data: names,
-      axisLabel: { fontSize: 11, color: "#444", width: 90, overflow: "truncate", fontWeight: "bold" },
-      axisTick: { show: false },
-      axisLine: { show: false },
-    },
-    visualMap: {
-      show: false,
-      min: 0,
-      max: 1,
-      inRange: { color: ["#3a9d6e", "#8ab830", "#d4a020", "#e87040", "#e03030"] },
-    },
-    series: [
-      {
-        type: "bar",
-        data: values.map((v) => ({
-          value: v,
-          itemStyle: {
-            borderRadius: [0, 6, 6, 0],
-            color: colorFunc(v),
-          },
-        })),
-        barMaxWidth: 22,
-        emphasis: {
-          itemStyle: { shadowBlur: 12, shadowColor: "rgba(224,48,48,0.3)" },
-        },
-        label: {
-          show: true,
-          position: "right",
-          fontSize: 11,
-          fontWeight: "bold",
-          color: "#555",
-          formatter: (p) => (p.value != null ? (p.value * 100).toFixed(0) + "%" : "-"),
-        },
-        markLine: {
-          silent: true,
-          symbol: "none",
-          lineStyle: { type: "dashed", color: "#e03030", width: 1.5 },
-          data: [{ xAxis: 0.8, label: { formatter: "过热 80%", fontSize: 10, color: "#e03030" } }],
-        },
-      },
-    ],
-  };
-
-  chart.setOption(option, true);
+    xAxis: { type: "value", min: 0, max: 1, axisLabel: { fontSize: 10, color: "#aaa", formatter: (v) => (v * 100).toFixed(0) + "%" }, splitLine: { lineStyle: { color: "#f0ede4" } } },
+    yAxis: { type: "category", data: names, axisLabel: { fontSize: 11, color: "#444", width: 90, overflow: "truncate", fontWeight: "bold" }, axisTick: { show: false }, axisLine: { show: false } },
+    series: [{ type: "bar", data: values.map((v) => ({ value: v, itemStyle: { borderRadius: [0, 6, 6, 0], color: colorFunc(v) } })),
+      label: { show: true, position: "right", fontSize: 11, fontWeight: "bold", color: "#555", formatter: (p) => p.value != null ? (p.value * 100).toFixed(0) + "%" : "-" },
+      markLine: { silent: true, symbol: "none", lineStyle: { type: "dashed", color: "#e03030", width: 1.5 }, data: [{ xAxis: 0.8, label: { formatter: "过热 80%", fontSize: 10, color: "#e03030" } }] },
+    }],
+  }, true);
 }
 
-// ---- 表格 ----
-function applyTableColumnFilter() {
-  const group = state.tableFilterGroup;
-  const table = document.getElementById("factorTable");
-  // 先全部显示
-  table.querySelectorAll(".col-momentum, .col-volatility, .col-crowding").forEach((el) => {
-    el.classList.remove("hidden");
-  });
-  if (group === "all") return;
-  const hideMap = {
-    momentum: ".col-volatility, .col-crowding",
-    volatility: ".col-momentum, .col-crowding",
-    crowding: ".col-momentum, .col-volatility",
-  };
-  table.querySelectorAll(hideMap[group] || "").forEach((el) => el.classList.add("hidden"));
-}
+// ---- 侧边栏行业树 ----
+function renderSidebarTree() {
+  const search = (els.sidebarSearch.value || "").toLowerCase();
+  els.sidebarTree.innerHTML = "";
 
-function renderTable() {
-  const search = els.tableSearch.value.toLowerCase();
-  const rows = state.rows.filter((r) => {
+  function matchNode(node) {
     if (!search) return true;
-    return (r.stock_name || "").toLowerCase().includes(search);
-  });
-
-  const fmtNum = (v, decimals = 4) => {
-    if (v == null || isNaN(v)) return "-";
-    return v.toFixed(decimals);
-  };
-
-  const momClass = (v) => (v > 0 ? "cell-positive" : v < 0 ? "cell-negative" : "cell-neutral");
-  const crowdClass = (v) => {
-    if (v > 0.8) return "crowding-high";
-    if (v > 0.6) return "crowding-mid";
-    return "crowding-low";
-  };
-
-  state.expandedIdx = null;
-
-  els.factorTableBody.innerHTML = rows
-    .map(
-      (r, idx) => `
-    <tr class="stock-row" data-idx="${idx}">
-      <td class="col-name" style="font-weight:700;cursor:pointer"><span class="expand-arrow">▶</span> ${r.stock_name || "-"}</td>
-      <td class="col-momentum ${momClass(r.rs_momentum_1)}">${fmtNum(r.rs_momentum_1)}</td>
-      <td class="col-momentum ${momClass(r.rs_momentum_5)}">${fmtNum(r.rs_momentum_5)}</td>
-      <td class="col-momentum ${momClass(r.rs_momentum_20)}">${fmtNum(r.rs_momentum_20)}</td>
-      <td class="col-momentum ${momClass(r.rs_momentum_60)}">${fmtNum(r.rs_momentum_60)}</td>
-      <td class="col-momentum ${momClass(r.return_momentum_1)}">${fmtNum(r.return_momentum_1)}</td>
-      <td class="col-momentum ${momClass(r.return_momentum_5)}">${fmtNum(r.return_momentum_5)}</td>
-      <td class="col-momentum ${momClass(r.return_momentum_20)}">${fmtNum(r.return_momentum_20)}</td>
-      <td class="col-momentum ${momClass(r.return_momentum_60)}">${fmtNum(r.return_momentum_60)}</td>
-      <td class="col-volatility">${fmtNum(r.close_vol_20)}</td>
-      <td class="col-volatility">${fmtNum(r.close_vol_60)}</td>
-      <td class="col-volatility">${fmtNum(r.close_vol_120)}</td>
-      <td class="col-volatility">${fmtNum(r.close_vol_250)}</td>
-      <td class="col-volatility">${fmtNum(r.intraday_vol_20)}</td>
-      <td class="col-volatility">${fmtNum(r.intraday_vol_60)}</td>
-      <td class="col-volatility">${fmtNum(r.intraday_vol_120)}</td>
-      <td class="col-volatility">${fmtNum(r.intraday_vol_250)}</td>
-      <td class="col-crowding ${crowdClass(r.amount_share_crowding_20)}">${fmtNum(r.amount_share_crowding_20)}</td>
-      <td class="col-crowding ${crowdClass(r.amount_share_crowding_60)}">${fmtNum(r.amount_share_crowding_60)}</td>
-      <td class="col-crowding ${crowdClass(r.amount_share_crowding_250)}">${fmtNum(r.amount_share_crowding_250)}</td>
-      <td class="col-crowding ${crowdClass(r.price_deviation_crowding_20)}">${fmtNum(r.price_deviation_crowding_20)}</td>
-      <td class="col-crowding ${crowdClass(r.price_deviation_crowding_60)}">${fmtNum(r.price_deviation_crowding_60)}</td>
-      <td class="col-crowding ${crowdClass(r.price_deviation_crowding_250)}">${fmtNum(r.price_deviation_crowding_250)}</td>
-      <td class="col-crowding ${crowdClass(r.rs_crowding_20)}">${fmtNum(r.rs_crowding_20)}</td>
-      <td class="col-crowding ${crowdClass(r.rs_crowding_60)}">${fmtNum(r.rs_crowding_60)}</td>
-      <td class="col-crowding ${crowdClass(r.rs_crowding_250)}">${fmtNum(r.rs_crowding_250)}</td>
-      <td class="col-crowding ${crowdClass(r.equal_weight_crowding_20)}">${fmtNum(r.equal_weight_crowding_20)}</td>
-      <td class="col-crowding ${crowdClass(r.equal_weight_crowding_60)}">${fmtNum(r.equal_weight_crowding_60)}</td>
-      <td class="col-crowding ${crowdClass(r.equal_weight_crowding_250)}">${fmtNum(r.equal_weight_crowding_250)}</td>
-    </tr>
-    <tr class="expand-row" data-idx="${idx}" hidden>
-      <td colspan="29">
-        <div class="expand-panel" id="expandPanel${idx}"></div>
-      </td>
-    </tr>`
-    )
-    .join("");
-
-  applyTableColumnFilter();
-
-  // 绑定点击
-  els.factorTableBody.querySelectorAll(".stock-row").forEach((row) => {
-    row.addEventListener("click", () => {
-      const idx = parseInt(row.dataset.idx);
-      toggleExpand(idx);
-    });
-  });
-}
-
-function toggleExpand(idx) {
-  // "全部"模式下不展开
-  if (state.tableFilterGroup === "all") return;
-
-  const expandRow = els.factorTableBody.querySelector(`.expand-row[data-idx="${idx}"]`);
-  const stockRow = els.factorTableBody.querySelector(`.stock-row[data-idx="${idx}"]`);
-  if (!expandRow || !stockRow) return;
-
-  const arrow = stockRow.querySelector(".expand-arrow");
-
-  // 折叠之前展开的行（包括箭头）
-  if (state.expandedIdx !== null) {
-    const prevExpand = els.factorTableBody.querySelector(`.expand-row[data-idx="${state.expandedIdx}"]`);
-    const prevStock = els.factorTableBody.querySelector(`.stock-row[data-idx="${state.expandedIdx}"]`);
-    const prevArrow = prevStock?.querySelector(".expand-arrow");
-    if (prevExpand) prevExpand.hidden = true;
-    if (prevArrow) prevArrow.textContent = "▶";
+    if (node.name.toLowerCase().includes(search)) return true;
+    if (node.children) return node.children.some(matchNode);
+    return false;
   }
 
-  // 如果点击的是已展开的行 → 折叠
-  if (state.expandedIdx === idx) {
-    expandRow.hidden = true;
-    if (arrow) arrow.textContent = "▶";
-    state.expandedIdx = null;
+  state.industryTree.filter(matchNode).forEach((l1) => {
+    const l1Div = document.createElement("div");
+    l1Div.className = "stree-node";
+    const l1Head = document.createElement("div");
+    l1Head.className = "stree-head stree-l1";
+    l1Head.innerHTML = `<span class="stree-arrow">▶</span> ${l1.name}`;
+    l1Head.addEventListener("click", () => {
+      l1Div.classList.toggle("open");
+      selectTreeNode({ level: "sw1", name: l1.name, children: l1.children });
+    });
+    l1Div.appendChild(l1Head);
+
+    const l1Body = document.createElement("div");
+    l1Body.className = "stree-body";
+    (l1.children || []).forEach((l2) => {
+      const l2Div = document.createElement("div");
+      l2Div.className = "stree-node";
+      const l2Head = document.createElement("div");
+      l2Head.className = "stree-head stree-l2";
+      l2Head.innerHTML = `<span class="stree-arrow">▶</span> ${l2.name}`;
+      l2Head.addEventListener("click", (e) => {
+        e.stopPropagation();
+        l2Div.classList.toggle("open");
+        selectTreeNode({ level: "sw2", name: l2.name, parent: l1.name, children: l2.children });
+      });
+      l2Div.appendChild(l2Head);
+
+      const l2Body = document.createElement("div");
+      l2Body.className = "stree-body";
+      (l2.children || []).forEach((l3) => {
+        const l3Item = document.createElement("div");
+        l3Item.className = "stree-head stree-l3";
+        l3Item.textContent = l3.name;
+        l3Item.addEventListener("click", (e) => {
+          e.stopPropagation();
+          selectTreeNode({ level: "sw3", name: l3.name, parent: l2.name, grandparent: l1.name });
+        });
+        l2Body.appendChild(l3Item);
+      });
+      l2Div.appendChild(l2Body);
+      l1Body.appendChild(l2Div);
+    });
+    l1Div.appendChild(l1Body);
+    els.sidebarTree.appendChild(l1Div);
+  });
+}
+
+// ---- 选中行业节点 ----
+async function selectTreeNode(node) {
+  state.selectedNode = node;
+
+  // Keep current level - don't auto-switch
+  // The matching logic below handles cross-level lookups
+
+  els.hierarchyPlaceholder.style.display = "none";
+  els.hierarchyContent.style.display = "block";
+
+  // Breadcrumb
+  let bc = "";
+  const levelLabel = { sw1: "申万一级行业", sw2: "申万二级行业", sw3: "申万三级行业" };
+  if (node.grandparent) bc = `${node.grandparent} / ${node.parent} / ${node.name}`;
+  else if (node.parent) bc = `${node.parent} / ${node.name}`;
+  else bc = node.name;
+  els.hierarchyBreadcrumb.textContent = `📍 ${bc}（${levelLabel[node.level] || node.level}）`;
+
+  // Collect rows: self + children
+  const matchName = (row, name) => {
+    if (!row || !row.stock_name) return false;
+    const sn = row.stock_name;
+    if (sn === name) return true;
+    if (sn.endsWith("-" + name)) return true;
+    if (sn.startsWith(name + "-")) return true;
+    return false;
+  };
+
+  const selfRow = state.rows.find((r) => matchName(r, node.name));
+  const allRows = [];
+  if (selfRow) allRows.push(selfRow);
+
+  const childRows = [];
+  if (node.children && node.children.length > 0) {
+    // Load child-level data for visualization
+    const childLevel = node.level === "sw1" ? "sw2" : "sw3";
+    try {
+      // Get the latest available date for the child level
+      const childDates = await fetchDates(childLevel);
+      const childDate = childDates.length > 0 ? childDates[0] : state.currentDate;
+      const childData = await fetchData(childDate, childLevel);
+      node.children.forEach((child) => {
+        const matchChild = (row, name) => {
+          if (!row || !row.stock_name) return false;
+          const sn = row.stock_name;
+          if (sn === name) return true;
+          if (sn.endsWith("-" + name)) return true;
+          if (sn.startsWith(name + "-")) return true;
+          return false;
+        };
+        const childRow = childData.find((r) => matchChild(r, child.name));
+        if (childRow) childRows.push(childRow);
+      });
+    } catch (e) { /* ignore */ }
+  }
+
+  renderHierarchyTable(allRows);
+  renderChildrenCharts(node, childRows);
+  await loadKline(node);
+}
+
+// ---- 子行业指标可视化 ----
+function renderChildrenCharts(node, childRows) {
+  const section = document.getElementById("childrenChartsSection");
+  const grid = document.getElementById("childrenChartsGrid");
+  if (!childRows.length || !node.children) {
+    section.style.display = "none";
     return;
   }
+  section.style.display = "block";
+  grid.innerHTML = "";
 
-  // 展开当前
-  expandRow.hidden = false;
-  if (arrow) arrow.textContent = "▼";
-  state.expandedIdx = idx;
+  // RS动量对比
+  const rsBox = createChildChartBox("RS动量(20日) 对比", "children-rs-momentum");
+  grid.appendChild(rsBox);
+  renderChildBarChart("children-rs-momentum", childRows, "rs_momentum_20", "RS动量(20日)", (v) => v > 0 ? "#d44" : "#3a8");
 
-  // 获取该行数据
-  const search = els.tableSearch.value.toLowerCase();
-  const rows = state.rows.filter((r) => {
-    if (!search) return true;
-    return (r.stock_name || "").toLowerCase().includes(search);
+  // 收益动量对比
+  const retBox = createChildChartBox("收益动量(20日) 对比", "children-ret-momentum");
+  grid.appendChild(retBox);
+  renderChildBarChart("children-ret-momentum", childRows, "return_momentum_20", "收益动量(20日)", (v) => v > 0 ? "#d44" : "#3a8");
+
+  // 收盘波动率对比
+  const volBox = createChildChartBox("收盘波动率(20日) 对比", "children-close-vol");
+  grid.appendChild(volBox);
+  renderChildBarChart("children-close-vol", childRows, "close_vol_20", "收盘波动率(20日)", (v) => v > 0.4 ? "#c44" : "#4a9");
+
+  // 等权复合拥挤度对比
+  const crowdBox = createChildChartBox("等权复合拥挤度(20日) 对比", "children-crowding");
+  grid.appendChild(crowdBox);
+  renderChildBarChart("children-crowding", childRows, "equal_weight_crowding_20", "拥挤度(20日)", (v) => v > 0.8 ? "#e03030" : v > 0.6 ? "#e87040" : "#3a9d6e");
+}
+
+function createChildChartBox(title, domId) {
+  const box = document.createElement("div");
+  box.className = "child-chart-box";
+  box.innerHTML = `<div class="child-chart-title">${title}</div><div id="${domId}" class="child-chart"></div>`;
+  return box;
+}
+
+function renderChildBarChart(domId, rows, valueKey, title, colorFunc) {
+  const dom = document.getElementById(domId);
+  if (!dom) return;
+  // Dispose old instance if exists
+  const old = echarts.getInstanceByDom(dom);
+  if (old) old.dispose();
+  const chart = echarts.init(dom);
+
+  const valid = rows.filter((r) => !isNaN(r[valueKey]) && (r.short_name || r.stock_name)).sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0));
+  if (!valid.length) { chart.clear(); return; }
+  const shortName = (name) => { const parts = (name || "").split("-"); return parts[parts.length - 1] || name; };
+  const names = valid.map((r) => shortName(r.stock_name)).reverse();
+  const values = valid.map((r) => r[valueKey]).reverse();
+  const barH = Math.max(18, Math.min(28, Math.floor(280 / names.length)));
+  const h = Math.max(180, names.length * (barH + 6) + 40);
+  dom.style.height = h + "px";
+
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    grid: { left: 80, right: 50, top: 8, bottom: 8 },
+    xAxis: { type: "value", axisLabel: { fontSize: 10, color: "#aaa" }, splitLine: { lineStyle: { color: "#f0ede4" } } },
+    yAxis: { type: "category", data: names, axisLabel: { fontSize: 11, color: "#444", width: 70, overflow: "truncate" }, axisTick: { show: false }, axisLine: { show: false } },
+    series: [{
+      type: "bar", data: values.map((v) => ({ value: v, itemStyle: { borderRadius: [0, 4, 4, 0], color: colorFunc(v) } })),
+      barMaxWidth: barH, label: { show: true, position: "right", fontSize: 10, color: "#999", formatter: (p) => (p.value != null && typeof p.value === 'number') ? p.value.toFixed(3) : "-" },
+    }],
   });
-  const row = rows[idx];
-  if (!row) return;
+}
 
-  // 根据筛选类型渲染对应图表
-  const panel = document.getElementById(`expandPanel${idx}`);
-  if (!panel || panel.dataset.rendered === state.tableFilterGroup) return;
-  panel.dataset.rendered = state.tableFilterGroup;
+function renderHierarchyTable(rows) {
+  const fmt = (v, d = 4) => (v == null || isNaN(v)) ? "-" : v.toFixed(d);
+  const momClass = (v) => v > 0 ? "cell-positive" : v < 0 ? "cell-negative" : "cell-neutral";
+  const crowdClass = (v) => { if (v > 0.8) return "crowding-high"; if (v > 0.6) return "crowding-mid"; return "crowding-low"; };
+  // Show only the last segment of stock_name for display
+  const shortName = (name) => { const parts = (name || "").split("-"); return parts[parts.length - 1] || name; };
 
-  const group = state.tableFilterGroup;
-  if (group === "momentum") {
-    panel.innerHTML = `
-      <div class="expand-panel-head">🔍 <strong>${row.stock_name}</strong> — 动量详情</div>
-      <div class="expand-charts">
-        <div class="expand-chart-box"><div class="expand-chart-title">RS 动量多窗口</div><div id="expRSMom${idx}" class="expand-chart"></div></div>
-        <div class="expand-chart-box"><div class="expand-chart-title">收益动量多窗口</div><div id="expRetMom${idx}" class="expand-chart"></div></div>
-      </div>`;
-    setTimeout(() => {
-      renderBarChart(`expRSMom${idx}`, row, "rs_momentum", "RS 动量", ["1", "5", "20", "60"]);
-      renderBarChart(`expRetMom${idx}`, row, "return_momentum", "收益动量", ["1", "5", "20", "60"]);
-    }, 50);
-  } else if (group === "volatility") {
-    panel.innerHTML = `
-      <div class="expand-panel-head">🔍 <strong>${row.stock_name}</strong> — 波动率详情</div>
-      <div class="expand-charts">
-        <div class="expand-chart-box"><div class="expand-chart-title">收盘波动率多窗口</div><div id="expCloseVol${idx}" class="expand-chart"></div></div>
-        <div class="expand-chart-box"><div class="expand-chart-title">日内波动率多窗口</div><div id="expIntraVol${idx}" class="expand-chart"></div></div>
-      </div>`;
-    setTimeout(() => {
-      renderLineChart(`expCloseVol${idx}`, row, "close_vol", "收盘波动率", ["20", "60", "120", "250"]);
-      renderLineChart(`expIntraVol${idx}`, row, "intraday_vol", "日内波动率", ["20", "60", "120", "250"]);
-    }, 50);
-  } else if (group === "crowding") {
-    panel.innerHTML = `
-      <div class="expand-panel-head">🔍 <strong>${row.stock_name}</strong> — 拥挤度详情</div>
-      <div class="expand-charts">
-        <div class="expand-chart-box">
-          <div class="expand-chart-title">四维拥挤度热力对比</div>
-          <div id="expCrowdHeat${idx}" class="expand-chart"></div>
-        </div>
-      </div>`;
-    setTimeout(() => {
-      renderCrowdHeatChart(`expCrowdHeat${idx}`, row);
-    }, 50);
+  els.hierarchyFactorBody.innerHTML = rows.map((r) => `
+    <tr>
+      <td style="font-weight:700;">${shortName(r.stock_name || "-")}</td>
+      <td class="${momClass(r.rs_momentum_1)}">${fmt(r.rs_momentum_1)}</td>
+      <td class="${momClass(r.rs_momentum_5)}">${fmt(r.rs_momentum_5)}</td>
+      <td class="${momClass(r.rs_momentum_20)}">${fmt(r.rs_momentum_20)}</td>
+      <td class="${momClass(r.rs_momentum_60)}">${fmt(r.rs_momentum_60)}</td>
+      <td class="${momClass(r.return_momentum_1)}">${fmt(r.return_momentum_1)}</td>
+      <td class="${momClass(r.return_momentum_5)}">${fmt(r.return_momentum_5)}</td>
+      <td class="${momClass(r.return_momentum_20)}">${fmt(r.return_momentum_20)}</td>
+      <td class="${momClass(r.return_momentum_60)}">${fmt(r.return_momentum_60)}</td>
+      <td>${fmt(r.close_vol_20)}</td><td>${fmt(r.close_vol_60)}</td><td>${fmt(r.close_vol_120)}</td><td>${fmt(r.close_vol_250)}</td>
+      <td>${fmt(r.intraday_vol_20)}</td><td>${fmt(r.intraday_vol_60)}</td><td>${fmt(r.intraday_vol_120)}</td><td>${fmt(r.intraday_vol_250)}</td>
+      <td class="${crowdClass(r.amount_share_crowding_20)}">${fmt(r.amount_share_crowding_20)}</td>
+      <td class="${crowdClass(r.amount_share_crowding_60)}">${fmt(r.amount_share_crowding_60)}</td>
+      <td class="${crowdClass(r.amount_share_crowding_250)}">${fmt(r.amount_share_crowding_250)}</td>
+      <td class="${crowdClass(r.price_deviation_crowding_20)}">${fmt(r.price_deviation_crowding_20)}</td>
+      <td class="${crowdClass(r.price_deviation_crowding_60)}">${fmt(r.price_deviation_crowding_60)}</td>
+      <td class="${crowdClass(r.price_deviation_crowding_250)}">${fmt(r.price_deviation_crowding_250)}</td>
+      <td class="${crowdClass(r.rs_crowding_20)}">${fmt(r.rs_crowding_20)}</td>
+      <td class="${crowdClass(r.rs_crowding_60)}">${fmt(r.rs_crowding_60)}</td>
+      <td class="${crowdClass(r.rs_crowding_250)}">${fmt(r.rs_crowding_250)}</td>
+      <td class="${crowdClass(r.equal_weight_crowding_20)}">${fmt(r.equal_weight_crowding_20)}</td>
+      <td class="${crowdClass(r.equal_weight_crowding_60)}">${fmt(r.equal_weight_crowding_60)}</td>
+      <td class="${crowdClass(r.equal_weight_crowding_250)}">${fmt(r.equal_weight_crowding_250)}</td>
+    </tr>`).join("");
+}
+
+// ---- K线图 ----
+async function loadKline(node) {
+  const level = node.level;
+  // Build full name for kline matching
+  let name = node.name;
+  if (node.grandparent) name = `${node.grandparent}-${node.parent}-${node.name}`;
+  else if (node.parent) name = `${node.parent}-${node.name}`;
+  const days = parseInt(els.klineDays.value) || 120;
+
+  // Show loading state
+  const dom = document.getElementById("klineChart");
+  if (dom) dom.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">加载K线数据...</div>';
+
+  try {
+    const data = await fetchKline(level, name);
+    if (!data || data.length === 0) {
+      renderEmptyKline();
+      return;
+    }
+    const sliced = data.slice(-days);
+    renderKlineChart(sliced, name);
+  } catch (e) {
+    renderEmptyKline();
   }
 }
 
-function renderBarChart(domId, row, prefix, title, windows) {
-  const dom = document.getElementById(domId);
-  if (!dom) return;
-  const chart = echarts.init(dom);
-  const data = windows.map((w) => row[`${prefix}_${w}`] || 0);
-  chart.setOption({
-    tooltip: { trigger: "axis", formatter: (p) => `${p[0].name}<br/>${title}: ${(p[0].value * 100).toFixed(2)}%` },
-    grid: { left: 55, right: 20, top: 15, bottom: 25 },
-    xAxis: { type: "category", data: windows.map((w) => `${w}日`), axisLabel: { fontSize: 10 } },
-    yAxis: { type: "value", axisLabel: { fontSize: 10, formatter: (v) => (v * 100).toFixed(0) + "%" }, splitLine: { lineStyle: { color: "#f0ede4" } } },
-    series: [{
-      type: "bar", barMaxWidth: 36,
-      data: data.map((v) => ({
-        value: v,
-        itemStyle: {
-          borderRadius: [4, 4, 0, 0],
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: v > 0 ? "#c44a4a" : "#4a9d6e" },
-            { offset: 1, color: v > 0 ? "#f0c0c0" : "#b0e0c0" },
-          ]),
-        },
-      })),
-      label: { show: true, position: "top", fontSize: 10, formatter: (p) => (p.value * 100).toFixed(1) + "%" },
-    }],
-  });
+function renderEmptyKline() {
+  const dom = document.getElementById("klineChart");
+  if (state.klineChart) { state.klineChart.dispose(); state.klineChart = null; }
+  if (dom) dom.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">暂无K线数据</div>';
 }
 
-function renderLineChart(domId, row, prefix, title, windows) {
-  const dom = document.getElementById(domId);
+function renderKlineChart(rawData, name) {
+  const dom = document.getElementById("klineChart");
+  if (state.klineChart) { state.klineChart.dispose(); state.klineChart = null; }
   if (!dom) return;
-  const chart = echarts.init(dom);
-  const data = windows.map((w) => row[`${prefix}_${w}`] || 0);
-  chart.setOption({
-    tooltip: { trigger: "axis" },
-    grid: { left: 55, right: 20, top: 15, bottom: 25 },
-    xAxis: { type: "category", data: windows.map((w) => `${w}日`), axisLabel: { fontSize: 10 } },
-    yAxis: { type: "value", axisLabel: { fontSize: 10 }, splitLine: { lineStyle: { color: "#f0ede4" } } },
-    series: [{
-      type: "line", data, smooth: true, symbol: "circle", symbolSize: 10,
-      lineStyle: { width: 3, color: "#c4a24a" }, itemStyle: { color: "#c4a24a" },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "rgba(196,162,74,0.25)" }, { offset: 1, color: "rgba(196,162,74,0.02)" }]) },
-      label: { show: true, fontSize: 10, formatter: (p) => p.value.toFixed(3) },
-    }],
+  state.klineChart = echarts.init(dom);
+
+  const dates = rawData.map((d) => d.date);
+  const ohlc = rawData.map((d) => [d.open, d.close, d.low, d.high]);
+  const volumes = rawData.map((d) => [d.volume || 0, d.open > d.close ? 1 : 0]);
+
+  state.klineChart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "cross" } },
+    grid: [
+      { left: "8%", right: "2%", top: "5%", height: "60%" },
+      { left: "8%", right: "2%", top: "72%", height: "20%" },
+    ],
+    xAxis: [
+      { type: "category", data: dates, gridIndex: 0, axisLabel: { fontSize: 10 }, axisLine: { onZero: false } },
+      { type: "category", data: dates, gridIndex: 1, axisLabel: { show: false }, axisLine: { onZero: false } },
+    ],
+    yAxis: [
+      { type: "value", gridIndex: 0, scale: true, splitLine: { lineStyle: { color: "#f0ede4" } } },
+      { type: "value", gridIndex: 1, scale: true, axisLabel: { show: false }, splitLine: { show: false } },
+    ],
+    series: [
+      {
+        type: "candlestick", name: name, data: ohlc, xAxisIndex: 0, yAxisIndex: 0,
+        itemStyle: { color: "#d44", color0: "#3a8", borderColor: "#d44", borderColor0: "#3a8" },
+      },
+      {
+        type: "bar", name: "成交量", data: volumes.map((v) => v[0]), xAxisIndex: 1, yAxisIndex: 1,
+        itemStyle: { color: (p) => volumes[p.dataIndex][1] ? "#d44" : "#3a8" },
+      },
+    ],
   });
-}
-
-function renderCrowdHeatChart(domId, row) {
-  const dom = document.getElementById(domId);
-  if (!dom) return;
-  const chart = echarts.init(dom);
-
-  const windows = ["20", "60", "250"];
-  const indicators = [
-    { name: "成交额占比", key: "amount_share_crowding" },
-    { name: "乖离率", key: "price_deviation_crowding" },
-    { name: "RS", key: "rs_crowding" },
-    { name: "等权复合", key: "equal_weight_crowding" },
-  ];
-
-  // 构建热力矩阵：行=指标，列=窗口
-  const heatData = [];
-  const xLabels = windows.map((w) => `${w}日`);
-  const yLabels = indicators.map((d) => d.name);
-
-  indicators.forEach((ind, yi) => {
-    windows.forEach((w, xi) => {
-      heatData.push([xi, yi, row[`${ind.key}_${w}`] || 0]);
-    });
-  });
-
-  const option = {
-    tooltip: {
-      formatter: (p) => {
-        const v = p.data[2];
-        const pct = (v * 100).toFixed(0);
-        let level = "🟢 低";
-        if (v > 0.8) level = "🔴 过热";
-        else if (v > 0.6) level = "🟠 偏高";
-        else if (v > 0.4) level = "🟡 中等";
-        return `<b>${yLabels[p.data[1]]}</b> · ${xLabels[p.data[0]]}<br/>拥挤度: <b>${pct}%</b> ${level}`;
-      },
-    },
-    grid: { left: 90, right: 30, top: 10, bottom: 30 },
-    xAxis: {
-      type: "category",
-      data: xLabels,
-      position: "top",
-      axisLabel: { fontSize: 11, fontWeight: "bold", color: "#555" },
-      axisLine: { show: false },
-      axisTick: { show: false },
-    },
-    yAxis: {
-      type: "category",
-      data: yLabels,
-      axisLabel: { fontSize: 12, fontWeight: "bold", color: "#333" },
-      axisLine: { show: false },
-      axisTick: { show: false },
-    },
-    visualMap: {
-      min: 0,
-      max: 1,
-      calculable: true,
-      orient: "horizontal",
-      left: "center",
-      bottom: 0,
-      inRange: { color: ["#e8f5e9", "#c8e6c9", "#fff9c4", "#ffe0b2", "#ffcdd2", "#ef9a9a", "#e57373"] },
-      text: ["过热", "冷静"],
-      textStyle: { fontSize: 10 },
-    },
-    series: [{
-      type: "heatmap",
-      data: heatData,
-      label: {
-        show: true,
-        fontSize: 13,
-        fontWeight: "bold",
-        formatter: (p) => (p.data[2] * 100).toFixed(0) + "%",
-      },
-      emphasis: {
-        itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.2)" },
-      },
-      itemStyle: { borderRadius: 4, borderWidth: 2, borderColor: "#fff" },
-    }],
-  };
-  chart.setOption(option);
 }
 
 // ---- 文档模态框 ----
 const DOC_MARKDOWN = `# 行业轮动板块模型
 
-行业分类标准：**申万行业分类（一级、二级）**
+行业分类标准：**申万行业分类（一级、二级、三级）**
 
 ---
 
@@ -791,98 +612,52 @@ const DOC_MARKDOWN = `# 行业轮动板块模型
 
 ### A. 动量
 
-> 下述 \`i\` 值取 **1、5、20、60**
+> 下述 i 值取 **1、5、20、60**
 
 #### 1. RS 动量
 使用 RS 在时间序列上的变化率衡量**剔除大盘影响后**的板块轮动强度。
 
-$$
-RS\\text{变化率} = \\frac{P_t / M_t}{P_{t-i} / M_{t-i}} - 1
-$$
+$$RS\\text{变化率} = \\frac{P_t / M_t}{P_{t-i} / M_{t-i}} - 1$$
 
-- \\(P_t\\)：本期板块收盘价
-- \\(M_t\\)：本期中证全指收盘价
+#### 2. 收益动量
+板块自身价格的变化率。
 
-#### 2. 简单收益率动量
-使用直接收益率衡量板块轮动强度。
-
-$$
-i\\text{期收益率} = \\frac{P_t}{P_{t-i}} - 1
-$$
-
----
+$$收益动量 = \\frac{P_t}{P_{t-i}} - 1$$
 
 ### B. 波动率
 
-> 下述 \`i\` 值取 **20、60、120、250**
+> 下述 i 值取 **20、60、120、250**
 
-#### 1. 年化历史收盘价波动率
+#### 1. 收盘价波动率（年化）
+$$\\sigma_{close} = \\text{std}(r_{close}) \\times \\sqrt{252}$$
 
-$$
-\\sigma_{close} = \\text{Std}(\\ln\\frac{P_t}{P_{t-1}})_{i\\text{期}} \\times \\sqrt{252}
-$$
-
-#### 2. 年化历史日内波动率
-
-$$
-\\sigma_{intraday} = \\text{Std}(\\ln\\frac{H_t}{L_t})_{i\\text{期}} \\times \\sqrt{252}
-$$
-
-- \\(H_t\\)：日内最高价
-- \\(L_t\\)：日内最低价
-
----
+#### 2. 日内波动率（年化）
+$$\\sigma_{intraday} = \\text{std}(r_{intraday}) \\times \\sqrt{252}$$
 
 ### C. 拥挤度
 
-> 下述 \`i\` 值取 **20、60、250**，所有拥挤度均为过去 \`i\` 期内的**分位数（0~1）**
+> 下述 i 值取 **20、60、250**
 
 #### 1. 成交额占比拥挤度
+板块成交额占全市场成交额比例的历史分位数。
 
-$$
-\\text{板块成交额} / \\text{市场成交额}\\ \\text{在过去 } i \\text{ 期内的分位数}
-$$
-
-#### 2. 价格乖离率拥挤度
-
-$$
-(\\frac{P_t}{MA_{20}} - 1)\\ \\text{在过去 } i \\text{ 期内的分位数}
-$$
+#### 2. 乖离率拥挤度
+板块价格偏离均线程度的历史分位数。
 
 #### 3. RS 拥挤度
+板块 RS 值的历史分位数。
 
-$$
-(\\frac{P_t}{M_t})\\ \\text{在过去 } i \\text{ 期内的分位数}
-$$
-
-#### 4. 等权复合拥挤度 ⚠️
-
-$$
-\\frac{1}{3} \\times [\\ \\text{成交额占比拥挤度} + \\text{价格乖离率拥挤度} + \\text{RS 拥挤度}\\ ]
-$$
-
-> **注意**：等权复合拥挤度越接近 1.0，表示该板块越"拥挤"，回调风险越大。
+#### 4. 等权复合拥挤度
+上述三个拥挤度的等权平均值。
 `;
 
-function openDocModal() {
-  if (!els.docContent.innerHTML) {
-    els.docContent.innerHTML = marked.parse(DOC_MARKDOWN);
-    renderMathInElement(els.docContent, {
-      delimiters: [
-        { left: "$$", right: "$$", display: true },
-        { left: "$", right: "$", display: false },
-      ],
-      throwOnError: false,
-    });
-  }
+async function openDocModal() {
   els.docModal.hidden = false;
-  document.body.style.overflow = "hidden";
+  els.docContent.innerHTML = marked.parse(DOC_MARKDOWN);
+  setTimeout(() => { if (window.renderMathInElement) renderMathInElement(els.docContent); }, 100);
 }
 
-function closeDocModal() {
-  els.docModal.hidden = true;
-  document.body.style.overflow = "";
-}
+function closeDocModal() { els.docModal.hidden = true; }
 
 // ---- 启动 ----
 init();

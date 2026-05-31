@@ -66,6 +66,14 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
+/* Fix sticky table headers: use opaque background so content doesn't show through */
+th {
+    background-color: #fef9e7;
+}
+[data-theme="dark"] th {
+    background-color: #2a2410;
+}
+
 /* Generic Glass Card Pattern */
 .glass-panel {
     background: var(--panel-bg);

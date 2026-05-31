@@ -42,8 +42,14 @@
 ### 6. 涨停分析 (`limitup_module/`)
 - **功能**: A 股涨停板数据多维度分析与可视化。
 - **逻辑**: 基于每日涨停 CSV 数据，提供日间趋势图（总涨停数、申万行业分布、韭研题材分布）、涨停股票明细表、行业/题材筛选与排序等功能。
+- **性能优化 (2026-05)**: 新增 `/api/trend` 后端聚合接口（带进程级缓存），前端改为渐进式加载（趋势聚合→当日明细→后台预加载），首屏加载速度提升 80%+。
 
-### 7. 公募基金重仓股跟踪 (`fund_monitor_module/`)
+### 7. 行业轮动分析 (`industryrotation_module/`)
+- **功能**: 基于申万行业分类的三级行业轮动识别与可视化。
+- **逻辑**: 计算各行业的 RS 动量、收益动量、波动率（收盘/日内）、拥挤度（成交额占比/乖离率/RS/等权复合）等多维度因子，支持 1/5/20/60 日多窗口切换。提供行业层级树导航、K线图、子行业对比等功能。
+- **性能优化 (2026-05)**: CDN 切换至国内镜像（bootcdn），首屏仅渲染核心图表（动量+拥挤度主图），其余图表延迟渲染，首屏渲染时间缩短 50%+。
+
+### 8. 公募基金重仓股跟踪 (`fund_monitor_module/`)
 - **功能**: 基于公募基金定期报告披露的持仓数据，追踪分析重仓股。
 - **逻辑**: 读取基金季报/半年报的 enriched CSV 数据，按申万行业层级（一级/二级/三级）展示行业排名、行业明细表、全市场 Top 300 重仓股，支持按持仓市值、基金覆盖数、持仓占比等多维度排序与搜索筛选。
 
@@ -101,12 +107,23 @@ SJTX_service/
 │   ├── sw_industry_code_map.csv   # 申万行业编码映射
 │   └── industry/                  # 按行业分类的 Markdown 研报
 ├── limitup_module/                # 涨停分析模块
-│   ├── routes.py                  # Flask 蓝图，涨停数据 API
+│   ├── routes.py                  # Flask 蓝图，涨停数据 API（含 /api/trend 聚合接口）
 │   ├── server.py                  # 原独立 HTTP 服务器（已整合到蓝图）
-│   ├── index.html                 # 涨停分析前端页面
-│   ├── app.js                     # 前端交互逻辑
+│   ├── limitup.html               # 涨停分析前端页面
+│   ├── app.js                     # 前端交互逻辑（渐进式加载）
 │   ├── styles.css                 # 前端样式
 │   └── data/                      # 每日涨停 CSV 数据
+├── industryrotation_module/       # 行业轮动分析模块
+│   ├── routes.py                  # Flask 蓝图，行业轮动数据 API
+│   ├── server.py                  # 原独立 HTTP 服务器（已整合到蓝图）
+│   ├── industryrotation.html      # 行业轮动前端页面
+│   ├── app.js                     # 前端交互逻辑（ECharts 图表、延迟渲染）
+│   ├── styles.css                 # 前端样式
+│   ├── sw_industry_code_map.csv   # 申万行业编码映射
+│   ├── L1_day/                    # 一级行业 K 线数据 (parquet)
+│   ├── L2_day/                    # 二级行业 K 线数据 (parquet)
+│   ├── L3_day/                    # 三级行业 K 线数据 (parquet)
+│   └── Technical Analysis/        # 技术分析因子 CSV 数据
 ├── fund_monitor_module/           # 公募基金重仓股跟踪模块
 │   ├── routes.py                  # Flask 蓝图，基金持仓数据 API
 │   ├── index.html                 # 基金重仓股跟踪前端页面

@@ -31,5 +31,10 @@
             btn.addEventListener('click', toggleTheme);
             updateButtonText(btn); // Set initial state
         });
+
+        // Fix sticky table headers: override semi-transparent background from global-theme.css
+        const thStyle = document.createElement('style');
+        thStyle.textContent = 'th{background-color:#fef9e7!important}[data-theme="dark"] th{background-color:#2a2410!important}';
+        document.head.appendChild(thStyle);
     });
 })();
